@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}주운 물건 등록 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<h1>주운 물건 등록</h1>
+<p class="lead">사진 한 장과 보관 장소만 있으면 돼요.</p>
+
+{% if error %}
+<p class="alert error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form id="register-form" class="form" method="post" action="/register" enctype="multipart/form-data">
+  <fieldset class="photo-picker">
+    <legend>사진 <span class="req">필수</span></legend>
+    <img id="preview" class="preview" alt="고른 사진 미리 보기" hidden>
+    <div class="photo-buttons">
+      <label class="btn btn-primary">
+        카메라로 찍기
+        <input class="visually-hidden" type="file" name="photo_camera" accept="image/*" capture="environment">
+      </label>
+      <label class="btn">
+        앨범에서 고르기
+        <input class="visually-hidden" type="file" name="photo_album" accept="image/*">
+      </label>
+    </div>
+    <p class="hint">사람 얼굴이나 이름·학번이 크게 보이지 않게 찍어 주세요.</p>
+  </fieldset>
+
+  <label class="field">
+    <span>보관 장소 <span class="req">필수</span></span>
+    <input name="storage_place" list="place-suggestions" required maxlength="50"
+           placeholder="예: 교무실" value="{{ values.storage_place or '' }}">
+  </label>
+  <datalist id="place-suggestions">
+    {% for place in suggestions %}<option value="{{ place }}">{% endfor %}
+  </datalist>
+
+  <label class="field">
+    <span>발견 장소</span>
+    <input name="found_place" maxlength="50" placeholder="예: 3층 복도, 체육관"
+           value="{{ values.found_place or '' }}">
+  </label>
+
+  <label class="field">
+    <span>발견 날짜</span>
+    <input type="date" name="found_date" max="{{ today }}" value="{{ values.found_date or '' }}">
+  </label>
+
+  <label class="field">
+    <span>메모</span>
+    <textarea name="memo" rows="3" maxlength="500"
+              placeholder="예: 뚜껑에 고양이 스티커가 붙어 있음">{{ values.memo or '' }}</textarea>
+  </label>
+
+  <button id="submit-button" class="btn btn-primary btn-block" type="submit">등록하기</button>
+</form>
+
+<script>
+  // 사진을 고르면 미리 보여 주고, 두 버튼 중 마지막에 고른 사진 하나만 보낸다.
+  const form = document.getElementById("register-form");
+  const fileInputs = form.querySelectorAll('input[type="file"]');
+  const preview = document.getElementById("preview");
+  const submitButton = document.getElementById("submit-button");
+
+  fileInputs.forEach((input) => {
+    input.addEventListener("change", () => {
+      const file = input.files[0];
+      if (!file) return;
+      fileInputs.forEach((other) => {
+        if (other !== input) other.value = "";
+      });
+      preview.src = URL.createObjectURL(file);
+      preview.hidden = false;
+    });
+  });
+
+  form.addEventListener("submit", (event) => {
+    const hasPhoto = [...fileInputs].some((input) => input.files.length > 0);
+    if (!hasPhoto) {
+      event.preventDefault();
+      alert("사진을 찍거나 골라 주세요.");
+      return;
+    }
+    // 두 번 눌러서 같은 물건이 두 번 등록되지 않게 막는다.
+    submitButton.disabled = true;
+    submitButton.textContent = "올리는 중…";
+  });
+
+  // 뒤로 가기로 돌아왔을 때 버튼이 계속 막혀 있지 않게 되돌린다.
+  window.addEventListener("pageshow", () => {
+    submitButton.disabled = false;
+    submitButton.textContent = "등록하기";
+  });
+</script>
+{% endblock %}
