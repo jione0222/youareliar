@@ -46,6 +46,10 @@ def warm_up() -> None:
     """서버가 켜질 때 뒤에서 실행: AI 모델을 미리 불러오고, 빠진 벡터를 채운다."""
     try:
         embedding.get_model()
+    except Exception:
+        log.exception("AI 모델을 불러오지 못했어요. 인터넷 연결을 확인하고 서버를 다시 켜 주세요.")
+        return
+    try:
         backfill()
     except Exception:
-        log.exception("AI 모델을 준비하지 못했어요. 인터넷 연결을 확인하고 서버를 다시 켜 주세요.")
+        log.exception("빠진 AI 벡터를 채우다가 DB 오류가 났어요. 서버를 다시 켜면 다시 시도해요.")

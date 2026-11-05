@@ -10,13 +10,24 @@ from psycopg_pool import ConnectionPool
 from . import config
 
 # 연결 풀: DB 연결을 미리 몇 개 만들어 두고 돌려 쓴다(요청마다 새로 연결하면 느리다).
-# prepare_threshold=None 은 Supabase 연결 중계기(pooler)와 충돌하지 않게 하는 설정이다.
 pool = ConnectionPool(
     config.DATABASE_URL,
     min_size=1,
     max_size=5,
     open=False,  # 서버가 시작될 때 main.py에서 연다
-    kwargs={"row_factory": dict_row, "prepare_threshold": None},
+    # 오래 안 쓴 연결은 Supabase나 인터넷 공유기가 중간에 끊어 버리기도 한다.
+    # 그래서 연결을 꺼내 줄 때마다 살아 있는지 확인하고, 끊겼으면 버리고 새로 연결한다.
+    check=ConnectionPool.check_connection,
+    kwargs={
+        "row_factory": dict_row,
+        # Supabase 연결 중계기(pooler)와 충돌하지 않게 하는 설정
+        "prepare_threshold": None,
+        # 쉬는 동안에도 30초마다 '살아 있어요' 신호를 보내서 연결이 덜 끊기게 한다.
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 3,
+    },
 )
 
 
