@@ -70,3 +70,4 @@
 - A 검색(2026-11-05): `google/siglip2-base-patch16-256`(SigLIP 2, 768차원)으로 사진·문장 벡터를 만들어 `item_vectors` 표(model, kind별)에 저장하고 pgvector 코사인 거리로 찾는다. 서버 시작 때 뒤에서 모델을 불러오고 빠진 벡터를 채운다(`app/indexing.py`).
 - 후보 모델 비교(시험 그림 3장·한국어 문장 4개): SigLIP 2 4/4, 다국어 CLIP 3/4. jina-clip-v2는 모델 저장소의 코드를 실행해야 해서(`trust_remote_code`) 안전 검사에서 막혔고, 비상업용 라이선스라 일단 뺐다. 팀이 원하면 정확도 시험 단계에서 다시 정한다.
 - 이 클라우드 작업 환경에서 모델을 받을 때는 `HF_HUB_DISABLE_XET=1`이 필요하다(Xet 전용 주소가 막혀 있음). 팀 노트북에서는 필요 없다.
+- 이 클라우드 작업 환경에서 로컬 시험을 할 때: 준비 스크립트가 Postgres(+pgvector)와 `.venv`, 로컬용 `.env`(연습 모드)를 만들어 둔다. Postgres는 꺼진 채로 시작하니 `pg_ctlcluster 16 main start`로 켠 뒤 서버를 실행한다.
