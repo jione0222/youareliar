@@ -65,3 +65,4 @@
 - 설정·실행 방법은 README.md에 있다. 서버 실행: `uvicorn app.main:app --reload`, DB 준비: `python -m app.migrate`.
 - DB 구조를 바꿀 때는 `db/migrations/`에 다음 번호의 SQL 파일을 새로 만든다. 이미 적용된 파일은 고치지 않는다.
 - `SUPABASE_URL`이 비어 있으면 사진을 `uploads/` 폴더에 저장하는 연습 모드로 동작한다(로컬 테스트용).
+- `requirements.txt`에는 영어(ASCII)만 쓴다. 한국어 윈도우의 오래된 pip가 이 파일을 cp949로 읽어서, 한글 주석이 있으면 설치가 실패한다.
