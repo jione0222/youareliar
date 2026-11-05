@@ -8,13 +8,13 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 
-from . import config, db, embedding, images, indexing, storage
+from . import config, db, describe, embedding, images, indexing, storage
 
 APP_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15MB보다 큰 파일은 받지 않는다
@@ -61,6 +61,16 @@ templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
 templates.env.filters["korean_date"] = korean_date
 
 
+def photo_hidden(item: dict) -> bool:
+    """Claude가 사진에서 얼굴이나 개인정보를 봤다면 공개 화면에서 사진을 가린다."""
+    info = item.get("ai_info") or {}
+    return bool(info.get("has_person_face") or info.get("has_personal_info"))
+
+
+templates.env.globals["photo_hidden"] = photo_hidden
+templates.env.globals["ai_enabled"] = describe.enabled
+
+
 def today() -> date:
     return datetime.now(config.TIMEZONE).date()
 
@@ -83,6 +93,7 @@ def register_form(request: Request):
 @app.post("/register")
 def register(
     request: Request,
+    background_tasks: BackgroundTasks,
     photo_camera: UploadFile | None = File(None),  # '카메라로 찍기' 버튼으로 고른 사진
     photo_album: UploadFile | None = File(None),  # '앨범에서 고르기' 버튼으로 고른 사진
     storage_place: str = Form(""),
@@ -148,6 +159,8 @@ def register(
 
     # 5) AI 검색을 위해 사진을 벡터로 바꿔 저장한다.
     indexing.index_photo(item_id, photo_jpeg)
+    # B 단계: Claude 설명은 몇 초 걸리므로, 화면을 먼저 보여 주고 뒤에서 처리한다.
+    background_tasks.add_task(indexing.describe_item, item_id, photo_jpeg, memo or None)
 
     # 6) 상세 화면으로 보낸다. 303으로 보내면 새로고침해도 두 번 등록되지 않는다.
     return RedirectResponse(f"/items/{item_id}?new=1", status_code=303)

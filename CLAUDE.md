@@ -71,3 +71,7 @@
 - 후보 모델 비교(시험 그림 3장·한국어 문장 4개): SigLIP 2 4/4, 다국어 CLIP 3/4. jina-clip-v2는 모델 저장소의 코드를 실행해야 해서(`trust_remote_code`) 안전 검사에서 막혔고, 비상업용 라이선스라 일단 뺐다. 팀이 원하면 정확도 시험 단계에서 다시 정한다.
 - 이 클라우드 작업 환경에서 모델을 받을 때는 `HF_HUB_DISABLE_XET=1`이 필요하다(Xet 전용 주소가 막혀 있음). 팀 노트북에서는 필요 없다.
 - 이 클라우드 작업 환경에서 로컬 시험을 할 때: 준비 스크립트가 Postgres(+pgvector)와 `.venv`, 로컬용 `.env`(연습 모드)를 만들어 둔다. Postgres는 꺼진 채로 시작하니 `pg_ctlcluster 16 main start`로 켠 뒤 서버를 실행한다.
+- B 단계 1부(2026-11-05): `app/describe.py`가 Claude API(`messages.parse` + Pydantic 스키마, effort medium)로 사진을 정리해 `items.ai_info`(jsonb)·`ai_description`에 저장한다. 등록 직후 BackgroundTasks로 실행하고, 서버 시작 때 빠진 것을 최대 30개 채운다. 얼굴·개인정보가 보이면 공개 화면에서 사진을 가린다. 아직 검색에는 쓰지 않는다(B 검색은 다음 단계).
+- Claude 모델 이름은 저장소에 적지 않고 `.env`의 `CLAUDE_MODEL`로만 정한다. 키가 없으면 B 기능만 꺼진다.
+- anthropic SDK 2.x는 API 키를 `Authorization: Bearer`로 보낸다(`x-api-key` 아님). 키 없이 시험할 때는 `ANTHROPIC_BASE_URL`을 가짜 서버로 돌려 시험했다.
+

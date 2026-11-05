@@ -5,6 +5,7 @@ SQL 문장은 모두 이 파일에 모아 둔다. 다른 파일은 여기 있는
 from datetime import date
 
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 from . import config
@@ -57,7 +58,7 @@ def list_items(limit: int = 60) -> list[dict]:
     with pool.connection() as conn:
         return conn.execute(
             """
-            select id, created_at, thumb_path, storage_place, found_place, found_date, status
+            select id, created_at, thumb_path, storage_place, found_place, found_date, status, ai_info
             from items
             where not hidden
             order by created_at desc
@@ -122,7 +123,7 @@ def search_by_vector(vector, model: str, kind: str, limit: int = 20) -> list[dic
         return conn.execute(
             """
             select i.id, i.created_at, i.thumb_path, i.storage_place, i.found_place,
-                   i.found_date, i.status,
+                   i.found_date, i.status, i.ai_info,
                    1 - (v.embedding <=> q.vec) as similarity
             from item_vectors v
             join items i on i.id = v.item_id
@@ -133,3 +134,35 @@ def search_by_vector(vector, model: str, kind: str, limit: int = 20) -> list[dic
             """,
             (to_pg_vector(vector), model, kind, limit),
         ).fetchall()
+
+
+# ---------- B 단계: Claude가 쓴 설명 ----------
+
+
+def save_description(item_id: int, info: dict, model: str) -> None:
+    """Claude가 정리한 결과를 저장한다. info는 ItemDescription을 dict로 바꾼 것."""
+    with pool.connection() as conn:
+        conn.execute(
+            """
+            update items
+            set ai_description = %s, ai_info = %s, ai_model = %s, ai_described_at = now()
+            where id = %s
+            """,
+            (info["description"], Jsonb(info), model, item_id),
+        )
+
+
+def items_missing_description(limit: int) -> list[dict]:
+    """아직 Claude 설명이 없는 물건들 (오래된 것부터)."""
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select id, photo_path, memo
+            from items
+            where ai_info is null and not hidden
+            order by id
+            limit %s
+            """,
+            (limit,),
+        ).fetchall()
+

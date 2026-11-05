@@ -28,6 +28,10 @@ EMBED_MODELS = {
 }
 EMBED_MODEL = os.getenv("EMBED_MODEL", "siglip2-base").strip()
 
+# B 단계: Claude API. 둘 다 있어야 동작하고, 없으면 B 기능만 꺼진다(A 검색은 그대로).
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "").strip()
+
 # 서버가 해외에 있어도 날짜는 한국 시간으로 계산한다.
 TIMEZONE = ZoneInfo("Asia/Seoul")
 
@@ -40,12 +44,18 @@ for name, value in [
     ("DATABASE_URL", DATABASE_URL),
     ("SUPABASE_URL", SUPABASE_URL),
     ("SUPABASE_SECRET_KEY", SUPABASE_SECRET_KEY),
+    ("ANTHROPIC_API_KEY", ANTHROPIC_API_KEY),
+    ("CLAUDE_MODEL", CLAUDE_MODEL),
 ]:
     if not value.isascii():
         _stop(
             f"{name}에 한글 같은 글자가 들어 있어요. 주소·비밀번호·키는 영어와 숫자로만 되어 있어야 해요.\n"
             "'비밀번호', '키', '프로젝트ID' 같은 예시 글자를 실제 값으로 바꿨는지 확인해 주세요."
         )
+if ANTHROPIC_API_KEY and not ANTHROPIC_API_KEY.startswith("sk-ant-"):
+    _stop("ANTHROPIC_API_KEY는 sk-ant- 로 시작해야 해요. Claude 콘솔에서 만든 키를 통째로 복사해 넣어 주세요.")
+if ANTHROPIC_API_KEY and not CLAUDE_MODEL:
+    _stop("ANTHROPIC_API_KEY는 있는데 CLAUDE_MODEL이 비어 있어요. 쓸 Claude 모델 이름을 넣어 주세요(README 참고).")
 if EMBED_MODEL not in EMBED_MODELS:
     _stop(f"EMBED_MODEL '{EMBED_MODEL}'은 없는 모델이에요. 쓸 수 있는 모델: {', '.join(EMBED_MODELS)}")
 if SUPABASE_URL:

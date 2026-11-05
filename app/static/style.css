@@ -452,3 +452,76 @@ h1 {
   background: var(--stored-bg);
   color: var(--stored-text);
 }
+
+/* ---------- B 단계: AI가 본 특징 ---------- */
+.card-what {
+  margin: 6px 0 0;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.card-what + .card-place {
+  margin-top: 2px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* 개인정보 때문에 가린 사진 자리 */
+.photo-hidden {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 12px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.detail-photo-hidden {
+  aspect-ratio: auto;
+  min-height: 200px;
+  font-size: 1rem;
+}
+
+.ai-box {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.ai-box h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.ai-box p {
+  margin: 0 0 10px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.chips li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--stored-bg);
+  color: var(--stored-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ai-pending {
+  margin: 0 0 16px;
+  color: var(--muted);
+}

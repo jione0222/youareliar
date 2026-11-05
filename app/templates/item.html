@@ -8,7 +8,11 @@
 {% endif %}
 
 <article class="detail">
+  {% if photo_hidden(item) %}
+  <div class="photo-hidden detail-photo-hidden">사진에 얼굴이나 개인정보가 보일 수 있어서 가렸어요.<br>보관 장소에서 직접 확인해 주세요.</div>
+  {% else %}
   <img class="detail-photo" src="{{ photo_url(item.photo_path) }}" alt="습득물 사진">
+  {% endif %}
   <div class="detail-body">
     <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
     <dl class="info">
@@ -25,6 +29,21 @@
       <dt>등록</dt>
       <dd>{{ item.created_at|korean_date }}</dd>
     </dl>
+    {% if item.ai_info %}
+    <section class="ai-box">
+      <h2>AI가 본 특징</h2>
+      <p>{{ item.ai_description }}</p>
+      <ul class="chips">
+        <li>{{ item.ai_info.category }}</li>
+        {% for color in item.ai_info.colors %}<li>{{ color }}</li>{% endfor %}
+        {% if item.ai_info.brand %}<li>{{ item.ai_info.brand }}</li>{% endif %}
+        {% for feature in item.ai_info.features %}<li>{{ feature }}</li>{% endfor %}
+      </ul>
+      <p class="hint">Claude가 사진을 보고 자동으로 쓴 내용이라 틀릴 수 있어요.</p>
+    </section>
+    {% elif ai_enabled() %}
+    <p class="ai-pending">AI가 사진을 살펴보고 있어요. 잠시 뒤 새로고침하면 특징이 보여요.</p>
+    {% endif %}
     <div class="notice">
       <strong>내 물건 같다면?</strong>
       <p>{{ item.storage_place }}에 가서 선생님께 확인을 받은 뒤 찾아가세요. 이 사이트는 물건이 어디 있는지만 알려 줘요.</p>
