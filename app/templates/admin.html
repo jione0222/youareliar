@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}관리자 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>관리자 화면</h1>
+  <form method="post" action="/admin/logout"><button class="btn btn-small" type="submit">나가기</button></form>
+</div>
+
+{% if message %}<p class="alert success" role="status">{{ message }}</p>{% endif %}
+
+<nav class="tabs" aria-label="보기 고르기">
+  {% for key, label in views.items() %}
+  <a href="/admin?view={{ key }}" class="{{ 'active' if key == view }}" {% if key == view %}aria-current="page"{% endif %}>
+    {{ label }} <span class="count">{{ counts[key] }}</span>
+  </a>
+  {% endfor %}
+</nav>
+
+{% if items %}
+<ul class="admin-list">
+  {% for item in items %}
+  <li class="admin-item {{ 'is-hidden' if item.hidden }}">
+    <img src="{{ photo_url(item.thumb_path) }}" alt="{{ item.id }}번 사진" loading="lazy" width="96" height="96">
+    <div class="admin-info">
+      <p class="admin-title">
+        <strong>{{ item.id }}번</strong>
+        {% if item.ai_info %}{{ item.ai_info.category }}{% endif %}
+      </p>
+      <p class="admin-badges">
+        <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
+        {% if item.hidden %}<span class="badge warn">숨김</span>{% endif %}
+        {% if privacy_flagged(item) %}
+          {% if item.privacy_reviewed %}<span class="badge stored">사진 공개 확인됨</span>
+          {% else %}<span class="badge warn">개인정보 의심 · 사진 가림</span>{% endif %}
+        {% endif %}
+      </p>
+      <p class="card-meta">{{ item.storage_place }} 보관 · {{ item.found_place or "발견 장소 모름" }} · 등록 {{ item.created_at|korean_date }}</p>
+      {% if item.memo %}<p class="card-meta">메모: {{ item.memo }}</p>{% endif %}
+    </div>
+    <div class="admin-actions">
+      <form method="post" action="/admin/items/{{ item.id }}/status">
+        <input type="hidden" name="view" value="{{ view }}">
+        {% if item.status == "stored" %}
+        <input type="hidden" name="status" value="returned"><button class="btn btn-small" type="submit">주인 찾음으로</button>
+        {% else %}
+        <input type="hidden" name="status" value="stored"><button class="btn btn-small" type="submit">보관 중으로</button>
+        {% endif %}
+      </form>
+      <form method="post" action="/admin/items/{{ item.id }}/hidden">
+        <input type="hidden" name="view" value="{{ view }}">
+        <input type="hidden" name="hidden" value="{{ 'false' if item.hidden else 'true' }}">
+        <button class="btn btn-small" type="submit">{{ '다시 보이기' if item.hidden else '숨기기' }}</button>
+      </form>
+      {% if privacy_flagged(item) %}
+      <form method="post" action="/admin/items/{{ item.id }}/privacy">
+        <input type="hidden" name="view" value="{{ view }}">
+        <input type="hidden" name="reviewed" value="{{ 'false' if item.privacy_reviewed else 'true' }}">
+        <button class="btn btn-small" type="submit">{{ '사진 다시 가리기' if item.privacy_reviewed else '확인 완료(사진 공개)' }}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="/admin/items/{{ item.id }}/delete"
+            onsubmit="return confirm('{{ item.id }}번을 정말 지울까요? 사진도 함께 지워지고 되돌릴 수 없어요.');">
+        <input type="hidden" name="view" value="{{ view }}">
+        <button class="btn btn-small btn-danger" type="submit">지우기</button>
+      </form>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty"><p>여기에 해당하는 물건이 없어요.</p></div>
+{% endif %}
+{% endblock %}

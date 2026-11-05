@@ -59,6 +59,15 @@ def load(path: str) -> bytes:
     return (LOCAL_DIR / path).read_bytes()
 
 
+def delete(paths: list[str]) -> None:
+    """사진 파일들을 지운다. (관리자가 글을 지울 때)"""
+    if bucket is not None:
+        bucket.remove(paths)
+    else:
+        for path in paths:
+            (LOCAL_DIR / path).unlink(missing_ok=True)
+
+
 def public_url(path: str) -> str:
     """화면에서 <img src="...">에 넣을 사진 주소를 만든다."""
     if bucket is not None:

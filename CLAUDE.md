@@ -74,4 +74,5 @@
 - B 단계 1부(2026-11-05): `app/describe.py`가 Claude API(`messages.parse` + Pydantic 스키마, effort medium)로 사진을 정리해 `items.ai_info`(jsonb)·`ai_description`에 저장한다. 등록 직후 BackgroundTasks로 실행하고, 서버 시작 때 빠진 것을 최대 30개 채운다. 얼굴·개인정보가 보이면 공개 화면에서 사진을 가린다. 아직 검색에는 쓰지 않는다(B 검색은 다음 단계).
 - Claude 모델 이름은 저장소에 적지 않고 `.env`의 `CLAUDE_MODEL`로만 정한다. 키가 없으면 B 기능만 꺼진다.
 - anthropic SDK 2.x는 API 키를 `Authorization: Bearer`로 보낸다(`x-api-key` 아님). 키 없이 시험할 때는 `ANTHROPIC_BASE_URL`을 가짜 서버로 돌려 시험했다.
+- 관리자 기능(2026-11-05): `app/admin.py`. `.env`의 `ADMIN_PASSWORD`(8자 이상)로 로그인하면 비밀번호로 서명한(HMAC) 쿠키를 준다(경로 /admin, HttpOnly, SameSite=Lax, 7일). 작업은 모두 POST 폼. 숨기기(hidden), 주인 찾음(status), 사진 공개 확인(`privacy_reviewed`, 마이그레이션 004), 지우기(사진 파일과 벡터까지). 템플릿 공통 설정은 `app/templating.py`.
 

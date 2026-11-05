@@ -58,7 +58,8 @@ def list_items(limit: int = 60) -> list[dict]:
     with pool.connection() as conn:
         return conn.execute(
             """
-            select id, created_at, thumb_path, storage_place, found_place, found_date, status, ai_info
+            select id, created_at, thumb_path, storage_place, found_place, found_date, status,
+                   ai_info, privacy_reviewed
             from items
             where not hidden
             order by created_at desc
@@ -123,7 +124,7 @@ def search_by_vector(vector, model: str, kind: str, limit: int = 20) -> list[dic
         return conn.execute(
             """
             select i.id, i.created_at, i.thumb_path, i.storage_place, i.found_place,
-                   i.found_date, i.status, i.ai_info,
+                   i.found_date, i.status, i.ai_info, i.privacy_reviewed,
                    1 - (v.embedding <=> q.vec) as similarity
             from item_vectors v
             join items i on i.id = v.item_id
@@ -165,4 +166,71 @@ def items_missing_description(limit: int) -> list[dict]:
             """,
             (limit,),
         ).fetchall()
+
+
+# ---------- 관리자 기능 ----------
+
+# 관리자 목록 화면의 보기(탭)별 조건
+ADMIN_VIEWS = {
+    "all": "true",
+    "hidden": "hidden",
+    "privacy": "(ai_info->>'has_person_face' = 'true' or ai_info->>'has_personal_info' = 'true')"
+               " and not privacy_reviewed",
+    "returned": "status = 'returned'",
+}
+
+
+def admin_list_items(view: str, limit: int = 200) -> list[dict]:
+    """관리자용 목록. 숨긴 글까지 모두 보여 준다."""
+    condition = ADMIN_VIEWS[view]  # 정해 둔 조건만 쓴다(사용자 입력을 SQL에 직접 넣지 않는다)
+    with pool.connection() as conn:
+        return conn.execute(
+            f"""
+            select id, created_at, thumb_path, storage_place, found_place, found_date, memo,
+                   status, hidden, ai_info, privacy_reviewed
+            from items
+            where {condition}
+            order by created_at desc
+            limit %s
+            """,
+            (limit,),
+        ).fetchall()
+
+
+def set_status(item_id: int, status: str) -> None:
+    with pool.connection() as conn:
+        conn.execute("update items set status = %s where id = %s", (status, item_id))
+
+
+def set_hidden(item_id: int, hidden: bool) -> None:
+    with pool.connection() as conn:
+        conn.execute("update items set hidden = %s where id = %s", (hidden, item_id))
+
+
+def set_privacy_reviewed(item_id: int, reviewed: bool) -> None:
+    with pool.connection() as conn:
+        conn.execute("update items set privacy_reviewed = %s where id = %s", (reviewed, item_id))
+
+
+def delete_item(item_id: int) -> dict | None:
+    """물건을 지우고, 지운 물건의 사진 경로를 돌려준다(사진 파일도 지워야 하므로).
+    벡터(item_vectors)는 표를 만들 때 정해 둔 규칙(on delete cascade) 덕분에 함께 지워진다."""
+    with pool.connection() as conn:
+        return conn.execute(
+            "delete from items where id = %s returning photo_path, thumb_path", (item_id,)
+        ).fetchone()
+
+
+def admin_counts() -> dict:
+    """관리자 화면의 탭에 보여 줄 개수."""
+    with pool.connection() as conn:
+        return conn.execute(
+            f"""
+            select count(*) as all,
+                   count(*) filter (where {ADMIN_VIEWS["privacy"]}) as privacy,
+                   count(*) filter (where hidden) as hidden,
+                   count(*) filter (where status = 'returned') as returned
+            from items
+            """
+        ).fetchone()
 

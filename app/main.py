@@ -5,26 +5,22 @@
 import threading
 import uuid
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 
-from . import config, db, describe, embedding, images, indexing, storage
+from . import admin, config, db, embedding, images, indexing, storage
+from .templating import templates, today
 
 APP_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15MB보다 큰 파일은 받지 않는다
 
 # 등록 화면에서 보관 장소로 추천할 곳 (목록에 없으면 직접 입력하면 된다)
 STORAGE_PLACE_SUGGESTIONS = ["교무실", "행정실", "체육관 사무실", "도서관", "보건실"]
-
-# DB에는 영어 코드로 저장하고, 화면에는 한국어로 보여 준다.
-STATUS_LABELS = {"stored": "보관 중", "returned": "주인 찾음"}
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,38 +38,7 @@ if not storage.using_supabase():
     storage.LOCAL_DIR.mkdir(exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=storage.LOCAL_DIR), name="uploads")
 
-templates = Jinja2Templates(directory=APP_DIR / "templates")
-
-
-def korean_date(value: date | datetime | None) -> str:
-    """날짜를 '11월 4일'처럼, 시각까지 있으면 '11월 4일 14:05'처럼 보여 준다."""
-    if value is None:
-        return ""
-    if isinstance(value, datetime):
-        value = value.astimezone(config.TIMEZONE)
-        return f"{value.month}월 {value.day}일 {value:%H:%M}"
-    return f"{value.month}월 {value.day}일"
-
-
-# 템플릿(HTML) 안에서 쓸 수 있게 등록해 둔다.
-templates.env.globals["photo_url"] = storage.public_url
-templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
-templates.env.filters["korean_date"] = korean_date
-
-
-def photo_hidden(item: dict) -> bool:
-    """Claude가 사진에서 얼굴이나 개인정보를 봤다면 공개 화면에서 사진을 가린다."""
-    info = item.get("ai_info") or {}
-    return bool(info.get("has_person_face") or info.get("has_personal_info"))
-
-
-templates.env.globals["photo_hidden"] = photo_hidden
-templates.env.globals["ai_enabled"] = describe.enabled
-
-
-def today() -> date:
-    return datetime.now(config.TIMEZONE).date()
-
+app.include_router(admin.router)  # 관리자 화면 (/admin)
 
 # ---------- 화면 ----------
 

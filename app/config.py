@@ -32,6 +32,9 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "siglip2-base").strip()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "").strip()
 
+# 관리자 화면(/admin) 비밀번호. 비어 있으면 관리자 화면에 들어갈 수 없다.
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+
 # 서버가 해외에 있어도 날짜는 한국 시간으로 계산한다.
 TIMEZONE = ZoneInfo("Asia/Seoul")
 
@@ -56,6 +59,8 @@ if ANTHROPIC_API_KEY and not ANTHROPIC_API_KEY.startswith("sk-ant-"):
     _stop("ANTHROPIC_API_KEY는 sk-ant- 로 시작해야 해요. Claude 콘솔에서 만든 키를 통째로 복사해 넣어 주세요.")
 if ANTHROPIC_API_KEY and not CLAUDE_MODEL:
     _stop("ANTHROPIC_API_KEY는 있는데 CLAUDE_MODEL이 비어 있어요. 쓸 Claude 모델 이름을 넣어 주세요(README 참고).")
+if ADMIN_PASSWORD and len(ADMIN_PASSWORD) < 8:
+    _stop("ADMIN_PASSWORD는 8자 이상으로 정해 주세요. 관리자는 글을 지울 수 있어서 쉽게 맞히면 안 돼요.")
 if EMBED_MODEL not in EMBED_MODELS:
     _stop(f"EMBED_MODEL '{EMBED_MODEL}'은 없는 모델이에요. 쓸 수 있는 모델: {', '.join(EMBED_MODELS)}")
 if SUPABASE_URL:

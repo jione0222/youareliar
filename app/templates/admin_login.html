@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}관리자 로그인 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<h1>관리자 로그인</h1>
+{% if not enabled %}
+<p class="alert error" role="alert">관리자 비밀번호가 아직 정해지지 않았어요. 서버의 <code>.env</code> 파일에 <code>ADMIN_PASSWORD</code>를 넣고 서버를 다시 켜 주세요.</p>
+{% else %}
+<p class="lead">선생님과 운영 팀만 들어올 수 있어요.</p>
+{% if error %}<p class="alert error" role="alert">{{ error }}</p>{% endif %}
+<form class="form" method="post" action="/admin/login">
+  <label class="field">
+    <span>관리자 비밀번호</span>
+    <input type="password" name="password" required autocomplete="current-password" autofocus>
+  </label>
+  <button class="btn btn-primary btn-block" type="submit">들어가기</button>
+</form>
+{% endif %}
+{% endblock %}

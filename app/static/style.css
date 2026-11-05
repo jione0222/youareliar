@@ -525,3 +525,117 @@ h1 {
   margin: 0 0 16px;
   color: var(--muted);
 }
+
+/* ---------- 관리자 화면 ---------- */
+.foot {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+  text-align: right;
+}
+
+.foot a {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.tabs a {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.tabs a.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.tabs .count {
+  margin-left: 2px;
+  opacity: 0.8;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.admin-item.is-hidden {
+  opacity: 0.7;
+}
+
+.admin-item img {
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--line);
+}
+
+.admin-info p {
+  margin: 0 0 4px;
+}
+
+.admin-title {
+  overflow-wrap: anywhere;
+}
+
+.admin-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.badge.warn {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-column: 1 / -1;
+}
+
+.admin-actions form {
+  margin: 0;
+}
+
+.btn-danger {
+  border-color: var(--error-text);
+  color: var(--error-text);
+}
