@@ -118,7 +118,9 @@ uvicorn app.main:app --reload
 ## 문제가 생겼을 때
 - `DATABASE_URL이 없습니다` → `.env` 파일이 프로젝트 폴더 맨 위에 있는지, 이름이 정확히 `.env`인지 확인하세요.
 - `password authentication failed` → `DATABASE_URL`의 비밀번호를 확인하세요. 대괄호 `[ ]`까지 지우고 비밀번호만 넣어야 합니다.
-- 사진 저장에서 `JWT`나 `Invalid API key` 오류 → Supabase의 **API Keys** 화면에 있는 Legacy API keys 탭의 `service_role` 키를 `SUPABASE_SECRET_KEY`에 넣어 보세요.
+- `[설정 오류]`로 시작하는 안내 → 안내에 나온 대로 `.env`를 고치면 됩니다.
+- `[사진 저장소 오류]` → `SUPABASE_SECRET_KEY`를 Supabase의 **Project Settings → API Keys**에서 다시 복사해 넣어 보세요. `sb_secret_`로 시작하는 키여야 합니다.
+- `No module named ...` → 줄 맨 앞에 `(.venv)`가 있는지 확인하세요. 없으면 `.venv\Scripts\Activate.ps1`(맥은 `source .venv/bin/activate`)을 먼저 실행합니다.
 
 ## 알아 둘 점
 - **비밀값은 `.env`에만** 넣습니다. `.env`는 `.gitignore`에 등록돼 있어 깃에 올라가지 않습니다.

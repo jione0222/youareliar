@@ -66,3 +66,4 @@
 - DB 구조를 바꿀 때는 `db/migrations/`에 다음 번호의 SQL 파일을 새로 만든다. 이미 적용된 파일은 고치지 않는다.
 - `SUPABASE_URL`이 비어 있으면 사진을 `uploads/` 폴더에 저장하는 연습 모드로 동작한다(로컬 테스트용).
 - `requirements.txt`에는 영어(ASCII)만 쓴다. 한국어 윈도우의 오래된 pip가 이 파일을 cp949로 읽어서, 한글 주석이 있으면 설치가 실패한다.
+- 사진 저장은 supabase-py 대신 `storage3`를 직접 쓴다. 새 방식 키(`sb_secret_`)는 JWT가 아니라서 `apikey` 헤더에만 넣어야 하는데, supabase-py는 `Authorization: Bearer`에도 넣어서 Storage가 'Invalid Compact JWS'로 거절한다(`app/storage.py`의 `make_storage_client` 참고).

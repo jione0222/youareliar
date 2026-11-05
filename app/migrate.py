@@ -10,6 +10,7 @@
 from pathlib import Path
 
 import psycopg
+from storage3.exceptions import StorageApiError
 
 from . import config, storage
 
@@ -45,18 +46,25 @@ def ensure_bucket() -> None:
     if not storage.using_supabase():
         print("  Supabase 설정이 없어 연습 모드로 동작합니다(사진은 uploads 폴더에 저장).")
         return
-    existing = {b.id for b in storage.client.storage.list_buckets()}
-    if config.STORAGE_BUCKET in existing:
-        print(f"  사진 저장 공간 '{config.STORAGE_BUCKET}'이 이미 있습니다.")
-        return
-    storage.client.storage.create_bucket(
-        config.STORAGE_BUCKET,
-        options={
-            "public": True,  # 목록에서 사진을 보여 줘야 하므로 공개
-            "allowed_mime_types": ["image/jpeg"],  # 서버가 JPEG로 바꿔서만 올린다
-            "file_size_limit": 5 * 1024 * 1024,  # 5MB
-        },
-    )
+    try:
+        existing = {b.id for b in storage.client.list_buckets()}
+        if config.STORAGE_BUCKET in existing:
+            print(f"  사진 저장 공간 '{config.STORAGE_BUCKET}'이 이미 있습니다.")
+            return
+        storage.client.create_bucket(
+            config.STORAGE_BUCKET,
+            options={
+                "public": True,  # 목록에서 사진을 보여 줘야 하므로 공개
+                "allowed_mime_types": ["image/jpeg"],  # 서버가 JPEG로 바꿔서만 올린다
+                "file_size_limit": 5 * 1024 * 1024,  # 5MB
+            },
+        )
+    except StorageApiError as error:
+        raise SystemExit(
+            f"\n[사진 저장소 오류] {error}\n"
+            "SUPABASE_SECRET_KEY를 Supabase의 Project Settings → API Keys에서 다시 복사해 넣어 보세요.\n"
+            "그래도 같은 오류가 나면 이 메시지를 보내 주세요(키는 지우고).\n"
+        )
     print(f"  사진 저장 공간 '{config.STORAGE_BUCKET}'을 만들었습니다.")
 
 

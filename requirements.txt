@@ -14,9 +14,9 @@ psycopg-pool==3.3.3
 # Photo processing
 pillow==13.0.0
 
-# Settings (.env) and Supabase Storage
+# Settings (.env) and Supabase Storage client
 python-dotenv==1.2.4
-supabase==2.34.0
+storage3==2.34.0
 
 # Time zone data (needed on Windows for Asia/Seoul)
 tzdata==2026.6

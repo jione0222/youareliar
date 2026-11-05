@@ -7,16 +7,31 @@
 """
 from pathlib import Path
 
+from storage3 import SyncStorageClient
+
 from . import config
 
 LOCAL_DIR = Path(__file__).resolve().parent.parent / "uploads"
 
-if config.SUPABASE_URL:
-    from supabase import create_client
 
-    # 비밀 키(secret key)는 서버에서만 쓴다. 브라우저로 보내는 화면에는 절대 넣지 않는다.
-    client = create_client(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY)
-    bucket = client.storage.from_(config.STORAGE_BUCKET)
+def make_storage_client(url: str, key: str) -> SyncStorageClient:
+    """Supabase Storage에 연결하는 객체를 만든다.
+
+    새 방식 키(sb_secret_...)는 JWT가 아니라서 'apikey' 헤더에만 넣어 보낸다.
+    Authorization 헤더에도 넣으면 Storage가 그 키를 JWT로 읽으려다
+    'Invalid Compact JWS' 오류를 낸다.
+    예전 방식 키(service_role, eyJ...로 시작하는 JWT)는 두 헤더에 모두 넣는다.
+    """
+    headers = {"apikey": key}
+    if not key.startswith("sb_"):
+        headers["Authorization"] = f"Bearer {key}"
+    return SyncStorageClient(f"{url.rstrip('/')}/storage/v1/", headers)
+
+
+if config.SUPABASE_URL:
+    # 비밀 키는 서버에서만 쓴다. 브라우저로 보내는 화면에는 절대 넣지 않는다.
+    client = make_storage_client(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY)
+    bucket = client.from_(config.STORAGE_BUCKET)
 else:
     client = None
     bucket = None
