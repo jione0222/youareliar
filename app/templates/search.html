@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}"{{ q }}" 검색 결과 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<section class="intro">
+  {% include "_search_form.html" %}
+</section>
+
+{% if ai_status == "ready" %}
+  {% if items %}
+  <p class="result-note">"<strong>{{ q }}</strong>"와(과) <strong>가장 비슷한 물건부터</strong> 보여 줘요. 번호가 작을수록 AI가 더 비슷하다고 판단한 물건이에요.</p>
+  <ul class="grid">
+    {% for item in items %}
+      {% set rank = loop.index %}
+      {% include "_card.html" %}
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty">
+    <p>아직 검색할 수 있는 물건이 없어요.</p>
+    <a class="btn" href="/">목록으로 가기</a>
+  </div>
+  {% endif %}
+{% elif ai_status == "error" %}
+<p class="alert error" role="alert">AI 모델을 불러오지 못했어요. 서버를 켠 창의 오류 메시지를 확인하고 서버를 다시 켜 주세요.</p>
+{% else %}
+<p class="alert info" role="status">AI 모델을 준비하고 있어요. 서버를 켠 직후에는 1분쯤 걸려요. 잠시 뒤 다시 검색해 주세요.</p>
+{% endif %}
+
+<a class="back" href="/">← 목록으로</a>
+{% endblock %}

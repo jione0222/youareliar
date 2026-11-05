@@ -67,3 +67,6 @@
 - `SUPABASE_URL`이 비어 있으면 사진을 `uploads/` 폴더에 저장하는 연습 모드로 동작한다(로컬 테스트용).
 - `requirements.txt`에는 영어(ASCII)만 쓴다. 한국어 윈도우의 오래된 pip가 이 파일을 cp949로 읽어서, 한글 주석이 있으면 설치가 실패한다.
 - 사진 저장은 supabase-py 대신 `storage3`를 직접 쓴다. 새 방식 키(`sb_secret_`)는 JWT가 아니라서 `apikey` 헤더에만 넣어야 하는데, supabase-py는 `Authorization: Bearer`에도 넣어서 Storage가 'Invalid Compact JWS'로 거절한다(`app/storage.py`의 `make_storage_client` 참고).
+- A 검색(2026-11-05): `google/siglip2-base-patch16-256`(SigLIP 2, 768차원)으로 사진·문장 벡터를 만들어 `item_vectors` 표(model, kind별)에 저장하고 pgvector 코사인 거리로 찾는다. 서버 시작 때 뒤에서 모델을 불러오고 빠진 벡터를 채운다(`app/indexing.py`).
+- 후보 모델 비교(시험 그림 3장·한국어 문장 4개): SigLIP 2 4/4, 다국어 CLIP 3/4. jina-clip-v2는 모델 저장소의 코드를 실행해야 해서(`trust_remote_code`) 안전 검사에서 막혔고, 비상업용 라이선스라 일단 뺐다. 팀이 원하면 정확도 시험 단계에서 다시 정한다.
+- 이 클라우드 작업 환경에서 모델을 받을 때는 `HF_HUB_DISABLE_XET=1`이 필요하다(Xet 전용 주소가 막혀 있음). 팀 노트북에서는 필요 없다.

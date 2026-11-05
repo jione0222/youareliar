@@ -52,6 +52,13 @@ def save(path: str, data: bytes, content_type: str = "image/jpeg") -> None:
         file.write_bytes(data)
 
 
+def load(path: str) -> bytes:
+    """저장해 둔 사진을 다시 읽어 온다. (나중에 AI 벡터를 다시 만들 때 쓴다)"""
+    if bucket is not None:
+        return bucket.download(path)
+    return (LOCAL_DIR / path).read_bytes()
+
+
 def public_url(path: str) -> str:
     """화면에서 <img src="...">에 넣을 사진 주소를 만든다."""
     if bucket is not None:

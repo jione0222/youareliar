@@ -20,3 +20,8 @@ storage3==2.34.0
 
 # Time zone data (needed on Windows for Asia/Seoul)
 tzdata==2026.6
+
+# AI model for search (A: photo <-> sentence vectors). CPU is enough.
+torch==2.15.0
+torchvision==0.29.2
+transformers==5.22.1

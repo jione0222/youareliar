@@ -2,6 +2,7 @@
 
 실행:  uvicorn app.main:app --reload
 """
+import threading
 import uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime
@@ -13,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 
-from . import config, db, images, storage
+from . import config, db, embedding, images, indexing, storage
 
 APP_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15MB보다 큰 파일은 받지 않는다
@@ -28,6 +29,8 @@ STATUS_LABELS = {"stored": "보관 중", "returned": "주인 찾음"}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.pool.open()  # 서버가 켜질 때 DB 연결을 준비하고
+    # AI 모델은 불러오는 데 시간이 걸려서, 서버를 먼저 띄우고 뒤에서(별도 스레드) 준비한다.
+    threading.Thread(target=indexing.warm_up, daemon=True).start()
     yield
     db.pool.close()  # 서버가 꺼질 때 정리한다
 
@@ -143,8 +146,24 @@ def register(
         photo_path, thumb_path, storage_place, found_place or None, parsed_date, memo or None
     )
 
-    # 5) 상세 화면으로 보낸다. 303으로 보내면 새로고침해도 두 번 등록되지 않는다.
+    # 5) AI 검색을 위해 사진을 벡터로 바꿔 저장한다.
+    indexing.index_photo(item_id, photo_jpeg)
+
+    # 6) 상세 화면으로 보낸다. 303으로 보내면 새로고침해도 두 번 등록되지 않는다.
     return RedirectResponse(f"/items/{item_id}?new=1", status_code=303)
+
+
+@app.get("/search")
+def search(request: Request, q: str = ""):
+    """AI 검색: 검색 문장을 벡터로 바꾼 뒤, 사진 벡터와 가까운 물건부터 보여 준다."""
+    query = q.strip()[:100]
+    if not query:
+        return RedirectResponse("/", status_code=303)
+    context = {"q": query, "items": [], "ai_status": embedding.status()}
+    if embedding.status() == "ready":
+        vector = embedding.embed_text(query)
+        context["items"] = db.search_by_vector(vector, config.EMBED_MODEL, "image", limit=20)
+    return templates.TemplateResponse(request, "search.html", context)
 
 
 @app.get("/items/{item_id}")

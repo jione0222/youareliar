@@ -3,24 +3,16 @@
 {% block content %}
 <section class="intro">
   <h1>잃어버린 물건, 여기 있을지도 몰라요</h1>
-  <p>학교에서 주운 물건들이에요. 사진을 누르면 어디에 보관 중인지 볼 수 있어요.</p>
+  <p>잃어버린 물건의 특징을 문장으로 적으면 AI가 비슷한 물건부터 찾아 줘요.</p>
+  {% include "_search_form.html" %}
 </section>
 
+<h2 class="section-title">최근 등록된 물건</h2>
 {% if items %}
 <ul class="grid">
   {% for item in items %}
-  <li>
-    <a class="card" href="/items/{{ item.id }}">
-      <img src="{{ photo_url(item.thumb_path) }}" alt="습득물 사진" loading="lazy" width="480" height="480">
-      <div class="card-body">
-        <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
-        <p class="card-place">{{ item.storage_place }} 보관</p>
-        <p class="card-meta">
-          {{ item.found_place or "발견 장소 모름" }}{% if item.found_date %} · {{ item.found_date|korean_date }}{% endif %}
-        </p>
-      </div>
-    </a>
-  </li>
+    {% set rank = none %}
+    {% include "_card.html" %}
   {% endfor %}
 </ul>
 {% else %}

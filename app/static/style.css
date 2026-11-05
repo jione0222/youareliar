@@ -389,3 +389,66 @@ h1 {
   font-weight: 700;
   text-decoration: none;
 }
+
+/* ---------- AI 검색 ---------- */
+.search {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 2px solid var(--primary);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.search .btn {
+  flex-shrink: 0;
+}
+
+.section-title {
+  margin: 24px 0 12px;
+  font-size: 1.05rem;
+}
+
+.result-note {
+  margin: 12px 0 16px;
+  color: var(--muted);
+}
+
+.result-note strong {
+  color: var(--text);
+}
+
+/* 검색 결과 카드 왼쪽 위의 순위 번호 */
+.card {
+  position: relative;
+}
+
+.rank {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 800;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+}
+
+.alert.info {
+  background: var(--stored-bg);
+  color: var(--stored-text);
+}

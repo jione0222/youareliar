@@ -1,0 +1,13 @@
+<li>
+  <a class="card" href="/items/{{ item.id }}">
+    {% if rank %}<span class="rank" aria-label="{{ rank }}번째로 비슷함">{{ rank }}</span>{% endif %}
+    <img src="{{ photo_url(item.thumb_path) }}" alt="습득물 사진" loading="lazy" width="480" height="480">
+    <div class="card-body">
+      <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
+      <p class="card-place">{{ item.storage_place }} 보관</p>
+      <p class="card-meta">
+        {{ item.found_place or "발견 장소 모름" }}{% if item.found_date %} · {{ item.found_date|korean_date }}{% endif %}
+      </p>
+    </div>
+  </a>
+</li>

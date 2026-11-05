@@ -60,3 +60,65 @@ def get_item(item_id: int) -> dict | None:
     """번호로 습득물 하나를 찾는다. 없으면 None."""
     with pool.connection() as conn:
         return conn.execute("select * from items where id = %s", (item_id,)).fetchone()
+
+
+# ---------- A 검색: 벡터 저장과 검색 ----------
+
+
+def to_pg_vector(vector) -> str:
+    """파이썬 숫자 목록을 Postgres가 읽을 수 있는 '[0.1,0.2,...]' 글자로 바꾼다."""
+    return "[" + ",".join(f"{x:.6f}" for x in vector) + "]"
+
+
+def save_vector(item_id: int, model: str, kind: str, vector) -> None:
+    """물건 하나의 벡터를 저장한다. 같은 모델·종류의 벡터가 이미 있으면 새 것으로 바꾼다."""
+    with pool.connection() as conn:
+        conn.execute(
+            """
+            insert into item_vectors (item_id, model, kind, embedding)
+            values (%s, %s, %s, %s::vector)
+            on conflict (item_id, model, kind)
+            do update set embedding = excluded.embedding, created_at = now()
+            """,
+            (item_id, model, kind, to_pg_vector(vector)),
+        )
+
+
+def items_missing_vector(model: str, kind: str) -> list[dict]:
+    """아직 벡터가 없는 물건들. (AI 모델이 준비되기 전에 등록됐거나, 모델을 바꿨을 때)"""
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select i.id, i.photo_path
+            from items i
+            where not exists (
+                select 1 from item_vectors v
+                where v.item_id = i.id and v.model = %s and v.kind = %s
+            )
+            order by i.id
+            """,
+            (model, kind),
+        ).fetchall()
+
+
+def search_by_vector(vector, model: str, kind: str, limit: int = 20) -> list[dict]:
+    """검색 문장의 벡터와 가장 가까운 물건부터 돌려준다.
+
+    <=> 는 pgvector의 '코사인 거리' 계산 기호다. 거리가 작을수록 비슷하다.
+    (코사인 유사도 = 1 - 코사인 거리)
+    """
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select i.id, i.created_at, i.thumb_path, i.storage_place, i.found_place,
+                   i.found_date, i.status,
+                   1 - (v.embedding <=> q.vec) as similarity
+            from item_vectors v
+            join items i on i.id = v.item_id
+            cross join (select %s::vector as vec) q
+            where v.model = %s and v.kind = %s and not i.hidden
+            order by v.embedding <=> q.vec
+            limit %s
+            """,
+            (to_pg_vector(vector), model, kind, limit),
+        ).fetchall()
