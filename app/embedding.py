@@ -1,11 +1,16 @@
-"""사진과 문장을 '벡터'(숫자 목록)로 바꾸는 곳 — A 검색의 핵심.
+"""사진과 문장을 '벡터'(숫자 목록)로 바꾸는 곳 — AI 검색의 핵심.
 
-같은 AI 모델로 바꾼 사진 벡터와 문장 벡터는 같은 '의미 공간'에 놓인다.
-그래서 두 벡터가 가까울수록(코사인 유사도가 클수록) 사진과 문장의 뜻이 비슷하다.
-예: "파란 텀블러"라는 문장 벡터는 파란 텀블러 사진 벡터와 가깝고, 체육복 사진 벡터와는 멀다.
+같은 AI 모델로 바꾼 벡터끼리는 같은 '의미 공간'에 놓인다.
+그래서 두 벡터가 가까울수록(코사인 유사도가 클수록) 뜻이 비슷하다.
 
-모델은 .env의 EMBED_MODEL로 고른다(쓸 수 있는 모델 목록은 config.py의 EMBED_MODELS).
-모델은 처음 쓸 때 한 번만 불러온다. 맨 처음에는 인터넷에서 약 1.5GB를 내려받는다.
+여기서는 모델 두 개를 쓴다.
+1. 사진 검색 모델 (SigLIP 2, A 방식): 사진과 검색 문장을 같은 공간의 벡터로 바꾼다.
+   예: "파란 텀블러" 문장 벡터는 파란 텀블러 '사진' 벡터와 가깝다.
+2. 설명 검색 모델 (KURE-v1, B 방식): Claude가 쓴 설명과 검색 문장을 벡터로 바꾼다.
+   한국어 글끼리 뜻을 비교하는 데 특화된 모델이다.
+   예: "물 마시는 통" 문장 벡터는 "텀블러" 설명 벡터와 가깝다(단어가 달라도).
+
+모델은 처음 쓸 때 한 번만 불러온다. 맨 처음에는 인터넷에서 내려받는다(각각 약 1.5GB, 2.3GB).
 """
 import logging
 import threading
@@ -16,10 +21,6 @@ from PIL import Image
 from . import config
 
 log = logging.getLogger("uvicorn.error")
-
-_model = None
-_lock = threading.Lock()
-_status = "idle"  # idle(아직 안 부름) → loading(불러오는 중) → ready(준비됨) / error(실패)
 
 
 class SigLIP2:
@@ -49,6 +50,25 @@ class SigLIP2:
         return _normalize(output)
 
 
+class KureText:
+    """KURE-v1 모델(고려대 NLP 연구실). 한국어 글을 검색용 벡터로 바꾼다."""
+
+    def __init__(self, model_id: str):
+        import torch
+        from transformers import AutoModel, AutoTokenizer
+
+        self.torch = torch
+        self.model = AutoModel.from_pretrained(model_id).eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+    def embed_texts(self, texts: list[str]) -> np.ndarray:
+        with self.torch.no_grad():
+            inputs = self.tokenizer(texts, padding=True, truncation=True, max_length=512, return_tensors="pt")
+            # 이 모델은 문장 맨 앞 칸([CLS])의 결과를 그 문장 전체의 뜻으로 쓴다.
+            output = self.model(**inputs).last_hidden_state[:, 0]
+        return _normalize(output)
+
+
 def _normalize(output) -> np.ndarray:
     """벡터 길이를 1로 맞춘다. 그러면 두 벡터의 곱(내적)이 곧 코사인 유사도가 된다."""
     tensor = getattr(output, "pooler_output", output)  # 라이브러리 버전에 따라 한 번 감싸서 줄 때가 있다
@@ -56,27 +76,51 @@ def _normalize(output) -> np.ndarray:
     return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
 
 
+class _LazyModel:
+    """처음 쓸 때 한 번만 불러오는 모델 상자. 여러 요청이 동시에 와도 한 번만 불러온다."""
+
+    def __init__(self, label: str, factory):
+        self.label = label
+        self.factory = factory
+        self.model = None
+        self.status = "idle"  # idle(아직 안 부름) → loading(불러오는 중) → ready(준비됨) / error(실패)
+        self.lock = threading.Lock()
+
+    def get(self):
+        if self.model is None:
+            with self.lock:
+                if self.model is None:
+                    self.status = "loading"
+                    log.info("%s을 불러오는 중… 처음에는 내려받느라 몇 분 걸릴 수 있어요.", self.label)
+                    try:
+                        self.model = self.factory()
+                    except Exception:
+                        self.status = "error"
+                        raise
+                    self.status = "ready"
+                    log.info("%s을 다 불러왔어요.", self.label)
+        return self.model
+
+
+_image_model = _LazyModel(
+    f"AI 모델({config.EMBED_MODEL})", lambda: SigLIP2(config.EMBED_MODELS[config.EMBED_MODEL])
+)
+_text_model = _LazyModel(
+    f"설명 검색 모델({config.TEXT_EMBED_MODEL})",
+    lambda: KureText(config.TEXT_EMBED_MODELS[config.TEXT_EMBED_MODEL]),
+)
+
+
+# ---------- 사진 검색 모델 (A) ----------
+
+
 def get_model() -> SigLIP2:
-    """모델을 (처음 한 번만) 불러와서 돌려준다. 여러 요청이 동시에 와도 한 번만 불러온다."""
-    global _model, _status
-    if _model is None:
-        with _lock:
-            if _model is None:
-                _status = "loading"
-                log.info("AI 모델(%s)을 불러오는 중… 처음에는 내려받느라 몇 분 걸릴 수 있어요.", config.EMBED_MODEL)
-                try:
-                    _model = SigLIP2(config.EMBED_MODELS[config.EMBED_MODEL])
-                except Exception:
-                    _status = "error"
-                    raise
-                _status = "ready"
-                log.info("AI 모델을 다 불러왔어요.")
-    return _model
+    return _image_model.get()
 
 
 def status() -> str:
-    """'idle', 'loading', 'ready', 'error' 중 하나."""
-    return _status
+    """사진 검색 모델 상태: 'idle', 'loading', 'ready', 'error' 중 하나."""
+    return _image_model.status
 
 
 def embed_image(image: Image.Image) -> np.ndarray:
@@ -85,5 +129,22 @@ def embed_image(image: Image.Image) -> np.ndarray:
 
 
 def embed_text(text: str) -> np.ndarray:
-    """문장 하나 → 벡터 하나."""
+    """검색 문장 → 사진과 비교할 벡터 하나."""
     return get_model().embed_texts([text])[0]
+
+
+# ---------- 설명 검색 모델 (B) ----------
+
+
+def get_text_model() -> KureText:
+    return _text_model.get()
+
+
+def text_status() -> str:
+    """설명 검색 모델 상태: 'idle', 'loading', 'ready', 'error' 중 하나."""
+    return _text_model.status
+
+
+def embed_description(text: str) -> np.ndarray:
+    """설명 글 또는 검색 문장 → 설명끼리 비교할 벡터 하나."""
+    return get_text_model().embed_texts([text])[0]

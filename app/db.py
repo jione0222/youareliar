@@ -234,3 +234,54 @@ def admin_counts() -> dict:
             """
         ).fetchone()
 
+
+# ---------- B 검색 ----------
+
+
+def items_missing_description_vector(model: str) -> list[dict]:
+    """Claude 설명은 있는데 설명 벡터가 아직 없는 물건들."""
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select i.id, i.ai_info, i.memo
+            from items i
+            where i.ai_info is not null
+              and not exists (
+                select 1 from item_vectors v
+                where v.item_id = i.id and v.model = %s and v.kind = 'description'
+              )
+            order by i.id
+            """,
+            (model,),
+        ).fetchall()
+
+
+def count_described() -> int:
+    with pool.connection() as conn:
+        return conn.execute("select count(*) as n from items where ai_info is not null").fetchone()["n"]
+
+
+def keyword_rows() -> list[dict]:
+    """키워드 검색에 쓸 글 재료 (공개된 물건만)."""
+    with pool.connection() as conn:
+        return conn.execute(
+            "select id, ai_info, memo, found_place, storage_place from items where not hidden"
+        ).fetchall()
+
+
+def items_by_ids(ids: list[int]) -> dict[int, dict]:
+    """번호 목록으로 카드에 보여 줄 정보를 한꺼번에 가져온다. {번호: 정보}"""
+    if not ids:
+        return {}
+    with pool.connection() as conn:
+        rows = conn.execute(
+            """
+            select id, created_at, thumb_path, storage_place, found_place, found_date, status,
+                   ai_info, privacy_reviewed
+            from items
+            where id = any(%s) and not hidden
+            """,
+            (ids,),
+        ).fetchall()
+    return {row["id"]: row for row in rows}
+

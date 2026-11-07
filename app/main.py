@@ -13,7 +13,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
-from . import admin, config, db, embedding, images, indexing, storage
+from . import admin, db, embedding, images, indexing, search, storage
 from .templating import templates, today
 
 APP_DIR = Path(__file__).resolve().parent
@@ -132,15 +132,21 @@ def register(
 
 
 @app.get("/search")
-def search(request: Request, q: str = ""):
-    """AI 검색: 검색 문장을 벡터로 바꾼 뒤, 사진 벡터와 가까운 물건부터 보여 준다."""
+def search_page(request: Request, q: str = "", debug: bool = False):
+    """AI 검색: 사진 벡터·설명 벡터·키워드로 찾은 순위를 합쳐서 비슷한 물건부터 보여 준다.
+    주소 끝에 &debug=1 을 붙이면 카드마다 방법별 등수가 보인다(발표·시험용)."""
     query = q.strip()[:100]
     if not query:
         return RedirectResponse("/", status_code=303)
-    context = {"q": query, "items": [], "ai_status": embedding.status()}
+    context = {
+        "q": query,
+        "items": [],
+        "ai_status": embedding.status(),
+        "uses_descriptions": embedding.text_status() == "ready",
+        "debug": debug,
+    }
     if embedding.status() == "ready":
-        vector = embedding.embed_text(query)
-        context["items"] = db.search_by_vector(vector, config.EMBED_MODEL, "image", limit=20)
+        context["items"] = search.search(query)
     return templates.TemplateResponse(request, "search.html", context)
 
 

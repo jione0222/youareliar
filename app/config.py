@@ -28,6 +28,12 @@ EMBED_MODELS = {
 }
 EMBED_MODEL = os.getenv("EMBED_MODEL", "siglip2-base").strip()
 
+# B 검색에서 Claude가 쓴 설명과 검색 문장을 비교할 한국어 글 모델
+TEXT_EMBED_MODELS = {
+    "kure-v1": "nlpai-lab/KURE-v1",
+}
+TEXT_EMBED_MODEL = os.getenv("TEXT_EMBED_MODEL", "kure-v1").strip()
+
 # B 단계: Claude API. 둘 다 있어야 동작하고, 없으면 B 기능만 꺼진다(A 검색은 그대로).
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "").strip()
@@ -61,6 +67,8 @@ if ANTHROPIC_API_KEY and not CLAUDE_MODEL:
     _stop("ANTHROPIC_API_KEY는 있는데 CLAUDE_MODEL이 비어 있어요. 쓸 Claude 모델 이름을 넣어 주세요(README 참고).")
 if ADMIN_PASSWORD and len(ADMIN_PASSWORD) < 8:
     _stop("ADMIN_PASSWORD는 8자 이상으로 정해 주세요. 관리자는 글을 지울 수 있어서 쉽게 맞히면 안 돼요.")
+if TEXT_EMBED_MODEL not in TEXT_EMBED_MODELS:
+    _stop(f"TEXT_EMBED_MODEL '{TEXT_EMBED_MODEL}'은 없는 모델이에요. 쓸 수 있는 모델: {', '.join(TEXT_EMBED_MODELS)}")
 if EMBED_MODEL not in EMBED_MODELS:
     _stop(f"EMBED_MODEL '{EMBED_MODEL}'은 없는 모델이에요. 쓸 수 있는 모델: {', '.join(EMBED_MODELS)}")
 if SUPABASE_URL:

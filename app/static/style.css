@@ -53,6 +53,8 @@ body {
   font-size: 16px; /* 16px보다 작으면 아이폰이 입력칸을 누를 때 화면을 확대한다 */
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
+  word-break: keep-all; /* 한국어 단어가 중간에서 끊기지 않게, 띄어쓰기에서만 줄을 바꾼다 */
+  overflow-wrap: anywhere; /* 대신 아주 긴 글자(주소 등)는 넘치지 않게 끊는다 */
 }
 
 /* ---------- 위쪽 막대 ---------- */
@@ -638,4 +640,14 @@ h1 {
 .btn-danger {
   border-color: var(--error-text);
   color: var(--error-text);
+}
+
+/* 검색 결과에 방법별 등수 보기 (주소 끝에 &debug=1) */
+.debug-ranks {
+  margin: 6px 0 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.75rem;
 }

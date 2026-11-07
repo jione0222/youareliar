@@ -13,6 +13,9 @@
       <p class="card-meta">
         {{ item.found_place or "발견 장소 모름" }}{% if item.found_date %} · {{ item.found_date|korean_date }}{% endif %}
       </p>
+      {% if debug and item.ranks %}
+      <p class="debug-ranks">사진 {{ item.ranks.image or "-" }}등 · 설명 {{ item.ranks.description or "-" }}등 · 키워드 {{ item.ranks.keyword or "-" }}등</p>
+      {% endif %}
     </div>
   </a>
 </li>

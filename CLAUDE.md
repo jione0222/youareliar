@@ -75,4 +75,6 @@
 - Claude 모델 이름은 저장소에 적지 않고 `.env`의 `CLAUDE_MODEL`로만 정한다. 키가 없으면 B 기능만 꺼진다.
 - anthropic SDK 2.x는 API 키를 `Authorization: Bearer`로 보낸다(`x-api-key` 아님). 키 없이 시험할 때는 `ANTHROPIC_BASE_URL`을 가짜 서버로 돌려 시험했다.
 - 관리자 기능(2026-11-05): `app/admin.py`. `.env`의 `ADMIN_PASSWORD`(8자 이상)로 로그인하면 비밀번호로 서명한(HMAC) 쿠키를 준다(경로 /admin, HttpOnly, SameSite=Lax, 7일). 작업은 모두 POST 폼. 숨기기(hidden), 주인 찾음(status), 사진 공개 확인(`privacy_reviewed`, 마이그레이션 004), 지우기(사진 파일과 벡터까지). 템플릿 공통 설정은 `app/templating.py`.
+- B 검색(2026-11-07): `app/search.py`가 사진 벡터(SigLIP 2)·설명 벡터(KURE-v1, `nlpai-lab/KURE-v1`)·키워드(두 글자 조각 겹침) 순위를 RRF(k=60, 비중 1:1:0.5)로 합친다. 설명 벡터는 `describe.document_for_search()` 글로 만들어 `item_vectors`(kind=description)에 저장. 설명 검색 모델은 Claude 키가 있거나 설명이 하나라도 있을 때만 불러온다(메모리 절약, 서버 합계 약 2.8GB). `/search?...&debug=1`이면 방법별 등수를 보여 준다.
+- 설명 벡터 모델 비교(Claude식 설명 24개, 쉬운 문제 40·의역 문제 22): KURE-v1 1등 100%/91%, e5-base 95%/82%, Qwen3-Embedding-0.6B 100%/77%, SigLIP 2 글자 부분 63%/41%, 키워드 98%/77%. 설명+키워드 RRF는 키워드 비중 0.5 이하에서 설명만 쓸 때와 같았다(96.8%). 사진 벡터 비중은 실제 사진 정확도 시험에서 다시 정한다. 시험 자료는 제가 직접 쓴 것이라 실제보다 쉬울 수 있다.
 

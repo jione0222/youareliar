@@ -91,3 +91,20 @@ def describe_photo(photo_jpeg: bytes, memo: str | None = None) -> ItemDescriptio
         response.usage.output_tokens,
     )
     return response.parsed_output
+
+
+def document_for_search(info: dict, memo: str | None = None) -> str:
+    """Claude가 정리한 결과(와 메모)를 검색용 글 한 덩어리로 만든다.
+    예: "텀블러 / 파란색 검은색 / 뚜껑에 고양이 스티커 / 텀블러, 물병, 보온병 / 파란색 텀블러이고 ..."
+    """
+    parts = [
+        info.get("category", ""),
+        " ".join(info.get("colors", [])),
+        info.get("brand", ""),
+        ", ".join(info.get("features", [])),
+        ", ".join(info.get("search_keywords", [])),
+        info.get("description", ""),
+        memo or "",
+    ]
+    return " / ".join(part for part in parts if part)
+
