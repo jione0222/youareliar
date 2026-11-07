@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}회원가입 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<h1>회원가입</h1>
+<p class="lead">아이디와 비밀번호만 있으면 돼요.</p>
+
+{% if error %}<p class="alert error" role="alert">{{ error }}</p>{% endif %}
+
+<form class="form" method="post" action="/signup">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label class="field">
+    <span>아이디</span>
+    <input name="username" required minlength="4" maxlength="20" pattern="[a-z0-9_]{4,20}"
+           autocomplete="username" autocapitalize="none" spellcheck="false"
+           value="{{ values.username or '' }}" placeholder="영어 소문자·숫자·밑줄(_) 4~20자">
+  </label>
+  <label class="field">
+    <span>닉네임</span>
+    <input name="nickname" required maxlength="20" value="{{ values.nickname or '' }}" placeholder="화면에 보일 이름">
+  </label>
+  <label class="field">
+    <span>비밀번호</span>
+    <input type="password" name="password" required minlength="8" maxlength="128" autocomplete="new-password"
+           placeholder="8자 이상">
+  </label>
+  <label class="field">
+    <span>비밀번호 확인</span>
+    <input type="password" name="password_confirm" required minlength="8" maxlength="128" autocomplete="new-password">
+  </label>
+  <button class="btn btn-primary btn-block" type="submit">가입하기</button>
+</form>
+<p class="switch-auth">이미 가입했나요? <a href="/login?next={{ next|urlencode }}">로그인</a></p>
+{% endblock %}

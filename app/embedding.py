@@ -93,10 +93,14 @@ class _LazyModel:
                     self.status = "loading"
                     log.info("%s을 불러오는 중… 처음에는 내려받느라 몇 분 걸릴 수 있어요.", self.label)
                     try:
-                        self.model = self.factory()
+                        model = self.factory()
+                        # 준비 운동: AI 모델은 첫 계산 때 준비 작업을 하느라 오래 걸린다.
+                        # 서버가 켜질 때 미리 한 번 계산해 두면, 첫 번째 검색하는 사람이 기다리지 않는다.
+                        model.embed_texts(["준비 운동"])
                     except Exception:
                         self.status = "error"
                         raise
+                    self.model = model
                     self.status = "ready"
                     log.info("%s을 다 불러왔어요.", self.label)
         return self.model

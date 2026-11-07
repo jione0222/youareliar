@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}로그인 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<h1>로그인</h1>
+
+{% if error %}<p class="alert error" role="alert">{{ error }}</p>{% endif %}
+
+<form class="form" method="post" action="/login">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label class="field">
+    <span>아이디</span>
+    <input name="username" required autocomplete="username" autocapitalize="none" spellcheck="false"
+           value="{{ username }}">
+  </label>
+  <label class="field">
+    <span>비밀번호</span>
+    <input type="password" name="password" required autocomplete="current-password">
+  </label>
+  <button class="btn btn-primary btn-block" type="submit">로그인</button>
+</form>
+<p class="switch-auth">처음이에요? <a href="/signup?next={{ next|urlencode }}">회원가입</a></p>
+{% endblock %}

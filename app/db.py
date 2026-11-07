@@ -39,16 +39,17 @@ def add_item(
     found_place: str | None,
     found_date: date | None,
     memo: str | None,
+    user_id: int | None = None,
 ) -> int:
-    """습득물 하나를 저장하고, 새로 붙은 번호(id)를 돌려준다."""
+    """습득물 하나를 저장하고, 새로 붙은 번호(id)를 돌려준다. user_id: 로그인한 등록자(없으면 None)."""
     with pool.connection() as conn:
         row = conn.execute(
             """
-            insert into items (photo_path, thumb_path, storage_place, found_place, found_date, memo)
-            values (%s, %s, %s, %s, %s, %s)
+            insert into items (photo_path, thumb_path, storage_place, found_place, found_date, memo, user_id)
+            values (%s, %s, %s, %s, %s, %s, %s)
             returning id
             """,
-            (photo_path, thumb_path, storage_place, found_place, found_date, memo),
+            (photo_path, thumb_path, storage_place, found_place, found_date, memo, user_id),
         ).fetchone()
     return row["id"]
 
@@ -284,4 +285,56 @@ def items_by_ids(ids: list[int]) -> dict[int, dict]:
             (ids,),
         ).fetchall()
     return {row["id"]: row for row in rows}
+
+
+# ---------- 회원과 로그인 상태 ----------
+
+
+def create_user(username: str, password_hash: str, nickname: str) -> int | None:
+    """회원을 만든다. 같은 아이디가 이미 있으면 None을 돌려준다."""
+    with pool.connection() as conn:
+        row = conn.execute(
+            """
+            insert into users (username, password_hash, nickname)
+            values (%s, %s, %s)
+            on conflict (username) do nothing
+            returning id
+            """,
+            (username, password_hash, nickname),
+        ).fetchone()
+    return row["id"] if row else None
+
+
+def get_user_by_username(username: str) -> dict | None:
+    with pool.connection() as conn:
+        return conn.execute(
+            "select id, username, password_hash, nickname from users where username = %s", (username,)
+        ).fetchone()
+
+
+def create_session(token_hash: str, user_id: int, expires_at) -> None:
+    with pool.connection() as conn:
+        conn.execute("delete from sessions where expires_at < now()")  # 기간이 끝난 로그인 정리
+        conn.execute(
+            "insert into sessions (token_hash, user_id, expires_at) values (%s, %s, %s)",
+            (token_hash, user_id, expires_at),
+        )
+
+
+def delete_session(token_hash: str) -> None:
+    with pool.connection() as conn:
+        conn.execute("delete from sessions where token_hash = %s", (token_hash,))
+
+
+def get_user_by_session(token_hash: str) -> dict | None:
+    """로그인 표시(토큰)의 해시로 회원을 찾는다. 기간이 끝났으면 None."""
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select u.id, u.username, u.nickname
+            from sessions s join users u on u.id = s.user_id
+            where s.token_hash = %s and s.expires_at > now()
+            """,
+            (token_hash,),
+        ).fetchone()
 

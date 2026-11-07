@@ -651,3 +651,59 @@ h1 {
   color: var(--muted);
   font-size: 0.75rem;
 }
+
+/* ---------- 회원가입·로그인 ---------- */
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.top-link,
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.user-name {
+  max-width: 7em;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switch-auth {
+  margin-top: 16px;
+  color: var(--muted);
+}
+
+.switch-auth a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* 좁은 휴대폰에서는 '+ 주운 물건 등록' 대신 '+ 등록'으로 줄인다 */
+@media (max-width: 400px) {
+  .long-label {
+    display: none;
+  }
+}

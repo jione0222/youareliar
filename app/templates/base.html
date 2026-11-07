@@ -9,7 +9,20 @@
 <body>
   <header class="top">
     <a class="logo" href="/">학교 분실물 찾기</a>
-    <a class="btn btn-primary btn-small" href="/register">+ 주운 물건 등록</a>
+    <div class="top-actions">
+      {% set user = current_user(request) %}
+      {% if user %}
+      <form class="user-menu" method="post" action="/logout">
+        <span class="user-name">{{ user.nickname }}님</span>
+        <button class="link-button" type="submit">로그아웃</button>
+      </form>
+      {% else %}
+      {# 로그인한 뒤 지금 보던 화면(검색어 포함)으로 돌아오게 한다 #}
+      {% set here = request.url.path ~ ("?" ~ request.url.query if request.url.query else "") %}
+      <a class="top-link" href="/login?next={{ here|urlencode }}">로그인</a>
+      {% endif %}
+      <a class="btn btn-primary btn-small" href="/register">+ <span class="long-label">주운 물건 </span>등록</a>
+    </div>
   </header>
   <main>
     {% block content %}{% endblock %}

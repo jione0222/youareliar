@@ -13,7 +13,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
-from . import admin, db, embedding, images, indexing, search, storage
+from . import accounts, admin, auth, db, embedding, images, indexing, search, storage
 from .templating import templates, today
 
 APP_DIR = Path(__file__).resolve().parent
@@ -39,6 +39,7 @@ if not storage.using_supabase():
     app.mount("/uploads", StaticFiles(directory=storage.LOCAL_DIR), name="uploads")
 
 app.include_router(admin.router)  # 관리자 화면 (/admin)
+app.include_router(accounts.router)  # 회원가입·로그인 (/signup, /login, /logout)
 
 # ---------- 화면 ----------
 
@@ -118,8 +119,15 @@ def register(
     storage.save(thumb_path, thumb_jpeg)
 
     # 4) 물건 정보를 DB에 저장한다.
+    user = auth.current_user(request)  # 로그인했으면 누가 등록했는지 적어 둔다
     item_id = db.add_item(
-        photo_path, thumb_path, storage_place, found_place or None, parsed_date, memo or None
+        photo_path,
+        thumb_path,
+        storage_place,
+        found_place or None,
+        parsed_date,
+        memo or None,
+        user_id=user["id"] if user else None,
     )
 
     # 5) AI 검색을 위해 사진을 벡터로 바꿔 저장한다.
