@@ -4,6 +4,7 @@ SQL 문장은 모두 이 파일에 모아 둔다. 다른 파일은 여기 있는
 """
 from datetime import date
 
+import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
@@ -23,6 +24,8 @@ pool = ConnectionPool(
         "row_factory": dict_row,
         # Supabase 연결 중계기(pooler)와 충돌하지 않게 하는 설정
         "prepare_threshold": None,
+        # 10초 안에 연결되지 않으면 포기하고 다시 시도한다(길이 막혔을 때 몇 분씩 기다리지 않게).
+        "connect_timeout": 10,
         # 쉬는 동안에도 30초마다 '살아 있어요' 신호를 보내서 연결이 덜 끊기게 한다.
         "keepalives": 1,
         "keepalives_idle": 30,
@@ -30,6 +33,16 @@ pool = ConnectionPool(
         "keepalives_count": 3,
     },
 )
+
+
+def check_connection() -> str | None:
+    """DB에 실제로 한 번 연결해 본다. 되면 None, 안 되면 오류 내용을 돌려준다(서버를 켤 때 확인용)."""
+    try:
+        with psycopg.connect(config.DATABASE_URL, connect_timeout=10) as conn:
+            conn.execute("select 1")
+    except psycopg.Error as error:
+        return str(error).strip() or type(error).__name__
+    return None
 
 
 def add_item(

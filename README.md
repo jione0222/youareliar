@@ -226,6 +226,7 @@ python -m app.migrate
 ## 문제가 생겼을 때
 - `DATABASE_URL이 없습니다` → `.env` 파일이 프로젝트 폴더 맨 위에 있는지, 이름이 정확히 `.env`인지 확인하세요.
 - `password authentication failed` → `DATABASE_URL`의 비밀번호를 확인하세요. 대괄호 `[ ]`까지 지우고 비밀번호만 넣어야 합니다.
+- 서버 창에 `[DB 연결 실패]` → 서버가 켜질 때 DB에 연결해 보고, 안 되면 이유와 고치는 방법을 바로 아래에 적어 줘요. 안내대로 `DATABASE_URL`을 고치세요.
 - `[설정 오류]`로 시작하는 안내 → 안내에 나온 대로 `.env`를 고치면 됩니다.
 - `[사진 저장소 오류]` → `SUPABASE_SECRET_KEY`를 Supabase의 **Project Settings → API Keys**에서 다시 복사해 넣어 보세요. `sb_secret_`로 시작하는 키여야 합니다.
 - `import torch`에서 `DLL load failed` 오류(윈도우) → 마이크로소프트의 **Visual C++ 재배포 가능 패키지(x64)** 를 설치한 뒤 다시 해 보세요.
