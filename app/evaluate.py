@@ -170,6 +170,8 @@ def main() -> None:
     by_id = {item["id"]: item for item in items}
     print(f"물건 {len(items)}개, 검색 문장 {len(queries)}개로 시험해요.")
 
+    # 시험은 시작 전에 비용을 따로 확인하므로, 서버용 하루 한도는 적용하지 않는다.
+    config.DESCRIBE_DAILY_LIMIT = 10**9
     use_claude = not args.no_claude and describe.enabled()
     use_rerank = use_claude and not args.no_rerank
     if not args.no_claude and not describe.enabled():

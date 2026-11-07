@@ -41,6 +41,8 @@ CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "").strip()
 CLAUDE_RERANK_MODEL = os.getenv("CLAUDE_RERANK_MODEL", "").strip()
 # 재순위(검색할 때 Claude 부르기)를 하루에 최대 몇 번까지 할지. 사용료가 갑자기 많이 나오지 않게.
 RERANK_DAILY_LIMIT = int(os.getenv("RERANK_DAILY_LIMIT", "200") or 200)
+# Claude 사진 정리(등록할 때)를 하루에 최대 몇 번까지 할지. 넘으면 다음 날 자동으로 이어서 정리한다.
+DESCRIBE_DAILY_LIMIT = int(os.getenv("DESCRIBE_DAILY_LIMIT", "100") or 100)
 
 # Claude가 사진에서 얼굴이나 이름·학번을 봤을 때 공개 화면에서 사진을 가릴지.
 # 팀이 2026-11-07에 끄기로 했다(기본 false). 켜려면 .env에 HIDE_PRIVATE_PHOTOS=true

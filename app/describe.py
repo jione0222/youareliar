@@ -9,7 +9,7 @@ import logging
 import anthropic
 from pydantic import BaseModel, Field
 
-from . import config
+from . import config, limits
 
 log = logging.getLogger("uvicorn.error")
 
@@ -55,6 +55,7 @@ def _get_client() -> anthropic.Anthropic:
 
 def describe_photo(photo_jpeg: bytes, memo: str | None = None) -> ItemDescription:
     """사진(과 메모)을 Claude에게 보내고, 정리된 결과를 받는다."""
+    limits.describe_limit.take()  # 하루 한도를 넘었으면 LimitReached (다음 날 자동으로 이어서 정리)
     text = "이 습득물 사진을 정리해 줘."
     if memo:
         text += f"\n<memo>{memo}</memo>"

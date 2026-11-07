@@ -9,12 +9,11 @@ import logging
 import threading
 import time
 from collections import OrderedDict
-from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from . import config, db, describe
+from . import config, db, describe, limits
 
 log = logging.getLogger("uvicorn.error")
 
@@ -45,12 +44,10 @@ class Reranking(BaseModel):
     ranking: list[RankedCandidate] = Field(description="같은 물건일 가능성이 높은 순서. 모든 후보를 한 번씩 넣는다.")
 
 
-class LimitReached(Exception):
-    """오늘 쓸 수 있는 재순위 횟수를 다 썼을 때."""
+LimitReached = limits.LimitReached  # main.py에서 rerank.LimitReached로 쓴다
 
 
 _cache: OrderedDict = OrderedDict()
-_counter = {"day": date.today(), "count": 0}
 _lock = threading.Lock()
 
 
@@ -77,16 +74,6 @@ def _candidate_text(item: dict) -> str:
     return f'<candidate id="{item["id"]}">\n' + "\n".join(lines) + "\n</candidate>"
 
 
-def _count_today() -> None:
-    """하루 한도를 넘었으면 LimitReached. 날짜가 바뀌면 다시 0부터 센다."""
-    with _lock:
-        if _counter["day"] != date.today():
-            _counter.update(day=date.today(), count=0)
-        if _counter["count"] >= config.RERANK_DAILY_LIMIT:
-            raise LimitReached()
-        _counter["count"] += 1
-
-
 def rerank(query: str, ids: list[int]) -> list[dict]:
     """후보 번호들을 Claude가 다시 줄 세운다. [{id, match, reason}, ...] (가능성 높은 순서)"""
     items = db.items_for_rerank(ids[:MAX_CANDIDATES])
@@ -100,7 +87,7 @@ def rerank(query: str, ids: list[int]) -> list[dict]:
             _cache.move_to_end(key)
             return cached[1]
 
-    _count_today()
+    limits.rerank_limit.take()  # 하루 한도를 넘었으면 LimitReached
     ranking = ask_claude(query, items)
     with _lock:
         _cache[key] = (time.time(), ranking)

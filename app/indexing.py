@@ -7,11 +7,12 @@
   (AI 모델이 준비되기 전에 등록된 물건이나, 모델을 바꿨을 때를 위해)
 """
 import logging
+import time
 from io import BytesIO
 
 from PIL import Image
 
-from . import config, db, describe, embedding, storage
+from . import config, db, describe, embedding, limits, storage
 
 log = logging.getLogger("uvicorn.error")
 
@@ -53,6 +54,9 @@ def describe_item(item_id: int, photo_jpeg: bytes, memo: str | None) -> bool:
         info = result.model_dump()
         db.save_description(item_id, info, config.CLAUDE_MODEL)
         log.info("물건 %s번: Claude가 특징을 정리했어요 (%s).", item_id, result.category)
+    except limits.LimitReached as error:
+        log.warning("물건 %s번: %s 내일 자동으로 이어서 정리해요.", item_id, error)
+        return False
     except Exception:
         log.exception("물건 %s번: Claude 설명을 받지 못했어요. 서버를 다시 켜면 다시 시도해요.", item_id)
         return False
@@ -87,7 +91,7 @@ DESCRIBE_BACKFILL_LIMIT = 30
 
 def backfill_descriptions() -> None:
     """Claude 설명이 없는 물건을 찾아 설명을 채운다."""
-    if not describe.enabled():
+    if not describe.enabled() or limits.describe_limit.exhausted():
         return
     missing = db.items_missing_description(DESCRIBE_BACKFILL_LIMIT)
     if not missing:
@@ -95,6 +99,9 @@ def backfill_descriptions() -> None:
     log.info("Claude 설명이 없는 물건 %d개를 처리할게요.", len(missing))
     done = 0
     for row in missing:
+        if limits.describe_limit.exhausted():
+            log.warning("오늘 Claude 사진 정리 한도를 다 써서, 나머지는 내일 이어서 정리해요.")
+            break
         try:
             photo = storage.load(row["photo_path"])
         except Exception:
@@ -104,19 +111,30 @@ def backfill_descriptions() -> None:
     log.info("Claude 설명을 %d개 만들었어요.", done)
 
 
+# 서버를 계속 켜 둘 때, 빠진 벡터·설명을 다시 채우는 간격 (실패했거나 하루 한도로 밀린 것)
+REFILL_SECONDS = 30 * 60
+
+
+def _fill_missing() -> None:
+    backfill()
+    # B: Claude를 쓰거나, 예전에 Claude가 써 둔 설명이 있을 때만 설명 검색 모델을 불러온다(메모리 절약).
+    if describe.enabled() or db.count_described() > 0:
+        embedding.get_text_model()
+        backfill_descriptions()
+        backfill_description_vectors()
+
+
 def warm_up() -> None:
-    """서버가 켜질 때 뒤에서 실행: AI 모델을 미리 불러오고, 빠진 벡터와 설명을 채운다."""
+    """서버가 켜질 때 뒤에서 실행: AI 모델을 미리 불러오고, 빠진 벡터와 설명을 채운다.
+    그 뒤로도 30분마다 다시 확인한다(서버를 며칠씩 켜 둘 때를 위해)."""
     try:
         embedding.get_model()
     except Exception:
         log.exception("AI 모델을 불러오지 못했어요. 인터넷 연결을 확인하고 서버를 다시 켜 주세요.")
         return
-    try:
-        backfill()
-        # B: Claude를 쓰거나, 예전에 Claude가 써 둔 설명이 있을 때만 설명 검색 모델을 불러온다(메모리 절약).
-        if describe.enabled() or db.count_described() > 0:
-            embedding.get_text_model()
-            backfill_descriptions()
-            backfill_description_vectors()
-    except Exception:
-        log.exception("빠진 벡터나 설명을 채우다가 오류가 났어요. 서버를 다시 켜면 다시 시도해요.")
+    while True:
+        try:
+            _fill_missing()
+        except Exception:
+            log.exception("빠진 벡터나 설명을 채우다가 오류가 났어요. %d분 뒤에 다시 시도해요.", REFILL_SECONDS // 60)
+        time.sleep(REFILL_SECONDS)
