@@ -338,3 +338,20 @@ def get_user_by_session(token_hash: str) -> dict | None:
             (token_hash,),
         ).fetchone()
 
+
+def items_for_rerank(ids: list[int]) -> list[dict]:
+    """재순위에 쓸 후보 정보 (공개된 물건만, 받은 번호 순서대로)."""
+    if not ids:
+        return []
+    with pool.connection() as conn:
+        rows = conn.execute(
+            """
+            select id, ai_info, memo, found_place, found_date, storage_place
+            from items
+            where id = any(%s) and not hidden
+            """,
+            (ids,),
+        ).fetchall()
+    by_id = {row["id"]: row for row in rows}
+    return [by_id[i] for i in ids if i in by_id]
+

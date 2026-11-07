@@ -707,3 +707,44 @@ h1 {
     display: none;
   }
 }
+
+/* ---------- 재순위: Claude가 쓴 이유 ---------- */
+.rerank-status {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--stored-bg);
+  color: var(--stored-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.ai-reason {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.match {
+  display: inline-block;
+  margin-right: 2px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.match-high {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.match-medium {
+  background: var(--stored-bg);
+  color: var(--stored-text);
+}
+
+.match-low {
+  background: var(--returned-bg);
+  color: var(--returned-text);
+}

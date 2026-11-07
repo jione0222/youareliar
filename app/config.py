@@ -37,6 +37,10 @@ TEXT_EMBED_MODEL = os.getenv("TEXT_EMBED_MODEL", "kure-v1").strip()
 # B 단계: Claude API. 둘 다 있어야 동작하고, 없으면 B 기능만 꺼진다(A 검색은 그대로).
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "").strip()
+# 재순위에만 다른(더 빠르고 싼) 모델을 쓰고 싶을 때. 비워 두면 CLAUDE_MODEL을 쓴다.
+CLAUDE_RERANK_MODEL = os.getenv("CLAUDE_RERANK_MODEL", "").strip()
+# 재순위(검색할 때 Claude 부르기)를 하루에 최대 몇 번까지 할지. 사용료가 갑자기 많이 나오지 않게.
+RERANK_DAILY_LIMIT = int(os.getenv("RERANK_DAILY_LIMIT", "200") or 200)
 
 # Claude가 사진에서 얼굴이나 이름·학번을 봤을 때 공개 화면에서 사진을 가릴지.
 # 팀이 2026-11-07에 끄기로 했다(기본 false). 켜려면 .env에 HIDE_PRIVATE_PHOTOS=true
@@ -59,6 +63,7 @@ for name, value in [
     ("SUPABASE_SECRET_KEY", SUPABASE_SECRET_KEY),
     ("ANTHROPIC_API_KEY", ANTHROPIC_API_KEY),
     ("CLAUDE_MODEL", CLAUDE_MODEL),
+    ("CLAUDE_RERANK_MODEL", CLAUDE_RERANK_MODEL),
 ]:
     if not value.isascii():
         _stop(

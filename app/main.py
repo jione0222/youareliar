@@ -2,6 +2,7 @@
 
 실행:  uvicorn app.main:app --reload
 """
+import logging
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -9,14 +10,15 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
-from . import accounts, admin, auth, db, embedding, images, indexing, search, storage
+from . import accounts, admin, auth, db, embedding, images, indexing, rerank, search, storage
 from .templating import templates, today
 
 APP_DIR = Path(__file__).resolve().parent
+log = logging.getLogger("uvicorn.error")
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15MB보다 큰 파일은 받지 않는다
 
 # 등록 화면에서 보관 장소로 추천할 곳 (목록에 없으면 직접 입력하면 된다)
@@ -151,11 +153,34 @@ def search_page(request: Request, q: str = "", debug: bool = False):
         "items": [],
         "ai_status": embedding.status(),
         "uses_descriptions": embedding.text_status() == "ready",
+        "rerank_enabled": rerank.enabled(),
         "debug": debug,
     }
     if embedding.status() == "ready":
         context["items"] = search.search(query)
     return templates.TemplateResponse(request, "search.html", context)
+
+
+@app.get("/search/rerank")
+def search_rerank(q: str = "", ids: str = ""):
+    """재순위: 검색 화면이 결과를 먼저 보여 준 뒤, 자바스크립트로 이 주소를 불러서
+    Claude가 다시 정한 순서와 이유를 받아 간다. 예: /search/rerank?q=파란 텀블러&ids=3,1,7"""
+    if not rerank.enabled():
+        return JSONResponse({"error": "재순위가 꺼져 있어요(Claude 키 없음)."}, status_code=404)
+    query = q.strip()[:100]
+    try:
+        item_ids = [int(part) for part in ids.split(",") if part.strip()][: rerank.MAX_CANDIDATES]
+    except ValueError:
+        return JSONResponse({"error": "후보 번호가 이상해요."}, status_code=400)
+    if not query or len(item_ids) < 2:
+        return {"ranking": []}
+    try:
+        return {"ranking": rerank.rerank(query, item_ids)}
+    except rerank.LimitReached:
+        return JSONResponse({"error": "오늘 쓸 수 있는 재순위 횟수를 다 썼어요."}, status_code=429)
+    except Exception:
+        log.exception("재순위를 하지 못했어요.")
+        return JSONResponse({"error": "재순위를 하지 못했어요."}, status_code=502)
 
 
 @app.get("/items/{item_id}")

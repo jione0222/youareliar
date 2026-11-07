@@ -80,4 +80,5 @@
 - 회원가입·로그인(2026-11-07, 팀 요청: 학교·이메일 인증 없이 기능만): `app/auth.py`(scrypt 비밀번호 해시, DB에 세션 토큰의 sha256만 저장, 쿠키 `session` HttpOnly·SameSite=Lax·30일), `app/accounts.py`(/signup, /login, /logout, `next`는 사이트 안 주소만 허용). 마이그레이션 005: users, sessions, items.user_id(로그인한 등록자). 관리자 로그인(ADMIN_PASSWORD)과는 따로다. 로그인은 아직 아무 기능도 막지 않는다.
 - 서버가 AI 모델을 불러올 때 '준비 운동'으로 한 번 계산해 둔다. 안 하면 켠 뒤 첫 검색이 몇십 초 걸릴 수 있다.
 - 개인정보 사진 가리기(2026-11-07, 팀 결정으로 끔): `.env`의 `HIDE_PRIVATE_PHOTOS`(기본 false). 꺼져 있으면 사진을 그대로 보여 주고, Claude가 얼굴·개인정보를 봤다고 표시한 물건은 관리자 화면에서만 '개인정보 의심'으로 알린다. '주의할 점'의 개인정보 항목과 다르므로, 학교에서 운영하기 전에 선생님과 다시 정한다.
+- 재순위(2026-11-07): `app/rerank.py`. 검색 화면이 합친 결과를 먼저 보여 주고, 자바스크립트가 `/search/rerank?q=&ids=`(상위 10개)를 불러 Claude가 정한 순서·가능성(high/medium/low)·이유로 카드를 바꿔 끼운다. 후보 정보는 `<candidate>` 태그로 감싸 지시로 따르지 않게 한다. 30분 캐시, 하루 한도 `RERANK_DAILY_LIMIT`(기본 200), 재순위 전용 모델 `CLAUDE_RERANK_MODEL`(비우면 CLAUDE_MODEL). Claude가 없는 번호·중복을 주면 걸러 내고 빠진 후보는 원래 순서로 뒤에 붙인다. `&debug=1`이면 'Claude n등'도 덧붙는다.
 

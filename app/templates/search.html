@@ -12,12 +12,62 @@
   <p class="result-note">"<strong>{{ q }}</strong>"와(과) <strong>가장 비슷한 물건부터</strong> 보여 줘요.
     {% if uses_descriptions %}AI가 사진, Claude가 쓴 설명, 겹치는 단어를 함께 따져서 정한 순서예요.{% else %}AI가 사진을 보고 정한 순서예요.{% endif %}
     번호가 작을수록 더 비슷해요.</p>
-  <ul class="grid">
+  <p id="rerank-status" class="rerank-status" role="status" hidden></p>
+  <ul id="results" class="grid" data-query="{{ q }}" data-rerank="{{ 'on' if rerank_enabled else 'off' }}">
     {% for item in items %}
       {% set rank = loop.index %}
       {% include "_card.html" %}
     {% endfor %}
   </ul>
+  <script>
+    // 재순위: 결과를 먼저 보여 준 뒤, Claude가 상위 10개를 다시 살펴본 순서와 이유를 받아 와서 바꿔 끼운다.
+    (async () => {
+      const list = document.getElementById("results");
+      const status = document.getElementById("rerank-status");
+      if (!list || list.dataset.rerank !== "on") return;
+      const cards = [...list.children];
+      const ids = cards.slice(0, 10).map((li) => li.dataset.id);
+      if (ids.length < 2) return;
+
+      status.textContent = "Claude가 위쪽 후보들을 다시 꼼꼼히 살펴보고 있어요…";
+      status.hidden = false;
+      try {
+        const url = `/search/rerank?q=${encodeURIComponent(list.dataset.query)}&ids=${ids.join(",")}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(String(response.status));
+        const { ranking } = await response.json();
+        if (!ranking.length) { status.hidden = true; return; }
+
+        const byId = Object.fromEntries(cards.map((li) => [li.dataset.id, li]));
+        const reranked = ranking.map((entry) => byId[entry.id]).filter(Boolean);
+        const rest = cards.filter((li) => !reranked.includes(li));
+        const matchLabels = { high: "같은 물건일 가능성 높음", medium: "비슷함", low: "다른 물건 같음" };
+
+        ranking.forEach((entry, index) => {
+          const li = byId[entry.id];
+          if (!li) return;
+          const reason = li.querySelector(".ai-reason");
+          reason.textContent = "";
+          const badge = document.createElement("span");
+          badge.className = `match match-${entry.match}`;
+          badge.textContent = matchLabels[entry.match] || "";
+          reason.append(badge, document.createTextNode(entry.reason ? " " + entry.reason : ""));
+          reason.hidden = false;
+          const debug = li.querySelector(".debug-ranks");
+          if (debug) debug.textContent += ` → Claude ${index + 1}등`;
+        });
+        [...reranked, ...rest].forEach((li, index) => {
+          list.appendChild(li);
+          const rank = li.querySelector(".rank");
+          rank.textContent = index + 1;
+          rank.setAttribute("aria-label", `${index + 1}번째로 비슷함`);
+        });
+        status.textContent = "Claude가 위쪽 후보들을 다시 살펴보고 순서를 정했어요. 카드마다 이유를 적어 뒀어요.";
+      } catch (error) {
+        status.textContent = "지금은 Claude가 다시 살펴볼 수 없어서, 처음 순서대로 보여 줘요.";
+      }
+    })();
+  </script>
   {% else %}
   <div class="empty">
     <p>아직 검색할 수 있는 물건이 없어요.</p>

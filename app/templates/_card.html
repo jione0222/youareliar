@@ -1,4 +1,4 @@
-<li>
+<li data-id="{{ item.id }}">
   <a class="card" href="/items/{{ item.id }}">
     {% if rank %}<span class="rank" aria-label="{{ rank }}번째로 비슷함">{{ rank }}</span>{% endif %}
     {% if photo_hidden(item) %}
@@ -13,6 +13,7 @@
       <p class="card-meta">
         {{ item.found_place or "발견 장소 모름" }}{% if item.found_date %} · {{ item.found_date|korean_date }}{% endif %}
       </p>
+      <p class="ai-reason" hidden></p>
       {% if debug and item.ranks %}
       <p class="debug-ranks">사진 {{ item.ranks.image or "-" }}등 · 설명 {{ item.ranks.description or "-" }}등 · 키워드 {{ item.ranks.keyword or "-" }}등</p>
       {% endif %}
