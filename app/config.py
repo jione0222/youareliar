@@ -38,6 +38,10 @@ TEXT_EMBED_MODEL = os.getenv("TEXT_EMBED_MODEL", "kure-v1").strip()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "").strip()
 
+# Claude가 사진에서 얼굴이나 이름·학번을 봤을 때 공개 화면에서 사진을 가릴지.
+# 팀이 2026-11-07에 끄기로 했다(기본 false). 켜려면 .env에 HIDE_PRIVATE_PHOTOS=true
+HIDE_PRIVATE_PHOTOS = os.getenv("HIDE_PRIVATE_PHOTOS", "false").strip().lower() in ("1", "true", "yes", "on")
+
 # 관리자 화면(/admin) 비밀번호. 비어 있으면 관리자 화면에 들어갈 수 없다.
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
 

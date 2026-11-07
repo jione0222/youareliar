@@ -31,8 +31,9 @@ def privacy_flagged(item: dict) -> bool:
 
 
 def photo_hidden(item: dict) -> bool:
-    """공개 화면에서 사진을 가릴지. 개인정보가 의심되면 관리자가 확인하기 전까지 가린다."""
-    return privacy_flagged(item) and not item.get("privacy_reviewed")
+    """공개 화면에서 사진을 가릴지.
+    .env의 HIDE_PRIVATE_PHOTOS가 켜져 있을 때만, 개인정보가 의심되는 사진을 관리자가 확인하기 전까지 가린다."""
+    return config.HIDE_PRIVATE_PHOTOS and privacy_flagged(item) and not item.get("privacy_reviewed")
 
 
 def today() -> date:
@@ -44,6 +45,7 @@ templates.env.globals["photo_url"] = storage.public_url
 templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
 templates.env.globals["photo_hidden"] = photo_hidden
 templates.env.globals["privacy_flagged"] = privacy_flagged
+templates.env.globals["HIDE_PRIVATE_PHOTOS"] = config.HIDE_PRIVATE_PHOTOS
 templates.env.globals["ai_enabled"] = describe.enabled
 templates.env.globals["current_user"] = auth.current_user
 templates.env.filters["korean_date"] = korean_date
