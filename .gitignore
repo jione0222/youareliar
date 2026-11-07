@@ -8,3 +8,7 @@ __pycache__/
 
 # 연습 모드에서 사진이 저장되는 폴더
 uploads/
+
+# 정확도 시험: 사진과 Claude 답 저장본은 올리지 않는다(용량·개인정보)
+eval/photos/
+eval/cache/

@@ -31,25 +31,38 @@ def _bigrams(text: str) -> set[str]:
     return pieces
 
 
-def _keyword_ranking(query: str) -> list[int]:
-    """검색 문장의 두 글자 조각이 물건 글에 몇 %나 들어 있는지로 순서를 매긴다."""
+def keyword_text(ai_info: dict | None, memo: str | None, found_place: str | None = None,
+                 storage_place: str | None = None) -> str:
+    """키워드 검색에 쓸 물건 글: Claude 설명 + 메모 + 장소."""
+    return " ".join(
+        [describe.document_for_search(ai_info or {}, memo), found_place or "", storage_place or ""]
+    )
+
+
+def keyword_ranking(query: str, texts: dict[int, str], limit: int = CANDIDATES) -> list[int]:
+    """검색 문장의 두 글자 조각이 물건 글에 몇 %나 들어 있는지로 순서를 매긴다. texts: {번호: 글}"""
     query_pieces = _bigrams(query)
     if not query_pieces:
         return []
     scored = []
-    for row in db.keyword_rows():
-        text = " ".join(
-            [
-                describe.document_for_search(row["ai_info"] or {}, row["memo"]),
-                row["found_place"] or "",
-                row["storage_place"] or "",
-            ]
-        )
+    for item_id, text in texts.items():
         score = len(query_pieces & _bigrams(text)) / len(query_pieces)
         if score > 0:
-            scored.append((score, row["id"]))
-    scored.sort(reverse=True)
-    return [item_id for _, item_id in scored[:CANDIDATES]]
+            scored.append((score, item_id))
+    scored.sort(key=lambda pair: -pair[0])  # 점수가 같으면 원래 순서 유지
+    return [item_id for _, item_id in scored[:limit]]
+
+
+def fuse(rankings: dict[str, list[int]], weights: dict[str, float] = WEIGHTS) -> tuple[list[int], dict]:
+    """방법별 순위들을 RRF로 합친다. → (합친 순서의 번호 목록, {번호: {방법: 등수}})"""
+    scores: dict[int, float] = defaultdict(float)
+    ranks: dict[int, dict] = defaultdict(dict)
+    for method, item_ids in rankings.items():
+        for rank, item_id in enumerate(item_ids, start=1):
+            scores[item_id] += weights.get(method, 0) / (RRF_K + rank)
+            ranks[item_id][method] = rank
+    ordered = sorted(scores, key=scores.get, reverse=True)
+    return ordered, ranks
 
 
 def search(query: str, limit: int = 20) -> list[dict]:
@@ -66,17 +79,14 @@ def search(query: str, limit: int = 20) -> list[dict]:
         )
         rankings["description"] = [row["id"] for row in description_hits]
 
-    rankings["keyword"] = _keyword_ranking(query)
+    texts = {
+        row["id"]: keyword_text(row["ai_info"], row["memo"], row["found_place"], row["storage_place"])
+        for row in db.keyword_rows()
+    }
+    rankings["keyword"] = keyword_ranking(query, texts)
 
-    # RRF로 합치기
-    scores: dict[int, float] = defaultdict(float)
-    ranks: dict[int, dict] = defaultdict(dict)
-    for method, item_ids in rankings.items():
-        for rank, item_id in enumerate(item_ids, start=1):
-            scores[item_id] += WEIGHTS[method] / (RRF_K + rank)
-            ranks[item_id][method] = rank
-
-    top_ids = sorted(scores, key=scores.get, reverse=True)[:limit]
+    ordered, ranks = fuse(rankings)  # RRF로 합치기
+    top_ids = ordered[:limit]
     items = db.items_by_ids(top_ids)
     results = []
     for item_id in top_ids:

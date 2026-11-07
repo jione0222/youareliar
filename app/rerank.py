@@ -101,6 +101,17 @@ def rerank(query: str, ids: list[int]) -> list[dict]:
             return cached[1]
 
     _count_today()
+    ranking = ask_claude(query, items)
+    with _lock:
+        _cache[key] = (time.time(), ranking)
+        while len(_cache) > CACHE_SIZE:
+            _cache.popitem(last=False)
+    return ranking
+
+
+def ask_claude(query: str, items: list[dict]) -> list[dict]:
+    """후보 정보(items)를 Claude에게 보여 주고 다시 정한 순서를 받는다. (캐시·하루 한도 없이 바로 부름)
+    items: [{id, ai_info, memo, found_place, found_date}, ...] → [{id, match, reason}, ...]"""
     candidates = "\n\n".join(_candidate_text(item) for item in items)
     response = describe._get_client().messages.parse(
         model=model_name(),
@@ -126,12 +137,7 @@ def rerank(query: str, ids: list[int]) -> list[dict]:
         if entry.id in known and entry.id not in seen:
             ranking.append({"id": entry.id, "match": entry.match, "reason": entry.reason.strip()})
             seen.add(entry.id)
-    for item_id in ids:
-        if item_id in known and item_id not in seen:
-            ranking.append({"id": item_id, "match": "low", "reason": ""})
-
-    with _lock:
-        _cache[key] = (time.time(), ranking)
-        while len(_cache) > CACHE_SIZE:
-            _cache.popitem(last=False)
+    for item in items:
+        if item["id"] not in seen:
+            ranking.append({"id": item["id"], "match": "low", "reason": ""})
     return ranking
