@@ -58,7 +58,7 @@
   - B와 재순위는 Claude를 쓴다. 상위 모델과 저가 모델의 정확도·비용을 시험해서 고른다.
   - A 모델 후보(jina-clip-v2, SigLIP 2, 다국어 CLIP)는 한국어 시험 세트로 재서 고른다.
 - **만드는 순서:** 등록 → 목록 → A 검색 → B 추가 → 재순위. 단계마다 실행해 확인한다.
-- **배포(2026-11-08 결정): Oracle 무료 서버(Ampere A1, 우분투 24.04) + Tailscale Funnel 주소.** 팀이 '내 컴퓨터를 꺼도 되게' 늘 열어 두기를 원했다. Hugging Face Spaces는 DB 포트가 막혀서 뺐다.
+- **배포(2026-11-08 결정): Oracle 무료 서버(Ampere A1, 우분투 24.04, 홈 영역은 일본 오사카 또는 도쿄) + Tailscale Funnel 주소.** 팀이 '내 컴퓨터를 꺼도 되게' 늘 열어 두기를 원했다. Hugging Face Spaces는 DB 포트가 막혀서 뺐다.
 - 비밀값은 `.env` 파일에만 넣고 깃에 올리지 않는다(`.env.example`만 올린다).
 
 ## 개발 메모
@@ -85,6 +85,7 @@
 - 계속 켜 두기 준비(2026-11-07): `app/limits.py`의 하루 한도(Claude 사진 정리 `DESCRIBE_DAILY_LIMIT` 기본 100, 재순위 `RERANK_DAILY_LIMIT` 기본 200, 한국 날짜 기준). 서버가 켜져 있는 동안 30분마다 빠진 벡터·설명을 채운다(`indexing.warm_up`). 윈도우용 `start_server.bat`(ASCII·CRLF, 운영 모드, 멈추면 10초 뒤 다시 켬, `logs/server.log`, `PYTHONUTF8=1`). 정확도 시험 도구는 하루 한도를 적용하지 않는다.
 - 오라클 배포(2026-11-08): `deploy/setup_server.sh`가 순서대로 한다. ① 메모리(3.5GB 이상)와 `.env` 확인 ② apt(python3-venv, git; 질문 창이 안 뜨게 noninteractive) ③ `.venv`에 CPU 전용 torch(download.pytorch.org/whl/cpu, 실패하면 PyPI) 뒤 requirements ④ migrate ⑤ systemd 서비스 `lostfound`(127.0.0.1:8000, Restart=always) ⑥ 첫 화면이 200인지 확인. 여러 번 실행해도 되고, 새 코드는 `git pull` 뒤 다시 실행한다. 바깥 주소는 Tailscale Funnel(`sudo tailscale funnel --bg 8000`)이라 서버 포트를 열지 않는다. 안내는 README '오라클 무료 서버에 올리기'.
 - PyPI의 torch 2.15.0은 리눅스(ARM 포함)에서 CUDA 패키지 19개(몇 GB)를 같이 깐다. 그래서 서버에서는 CPU 전용 판을 먼저 시도한다. ARM(aarch64, cp312)에서 requirements 88개가 모두 받아지는 것을 pip로 확인했다(CPU 전용 주소는 이 클라우드 환경에서 막혀 있어 시험 못 함).
+- 오라클 가입 화면의 홈 영역 목록에 한국이 없었다(2026-11-08 팀 확인). 서울은 새 가입 때 고를 수 없고, 춘천은 무료 A1을 만들 수 없다는 후기·안내가 있다. 그래서 일본 오사카(Japan Central)나 도쿄(Japan East)를 쓴다. 서버에서 DB(Supabase 서울)까지 한 번 다녀오는 데 약 30ms가 더 든다.
 - A1 서버는 OCPU 2·메모리 12GB로 만든다. 오라클은 7일 동안 CPU(95번째 백분위)·네트워크·메모리(A1만)가 모두 20% 미만이면 '노는 서버'로 회수할 수 있는데, 모델 둘을 불러온 서버가 약 2.9GB라 12GB의 20%를 넘는다. 2026년에 무료 A1 한도가 4 OCPU/24GB에서 2 OCPU/12GB로 줄었다는 기사가 있다(공식 문서로는 확인 못 함).
 - 이 클라우드 작업 환경에는 systemd가 없어서(PID 1이 systemd가 아님), setup_server.sh는 `sudo`·`systemctl`을 가짜로 바꿔 끝까지 시험했고 유닛 파일은 `systemd-analyze verify`로 확인했다.
 - Hugging Face Spaces는 안 된다(2026-11-07 확인): 공식 문서(spaces-overview 'Networking')에 밖으로 나가는 연결은 80·443·8080 포트만 되고 나머지는 막힌다고 적혀 있다. 서버가 Supabase Postgres(5432·6543)에 직접 붙어야 하므로 연결할 수 없다. 2023년에 5432를 열어 줬다는 포럼 글이 있지만 2025년에도 열어 달라는 글이 있고, 문서가 더 최신이다. Docker Space는 PRO(월 9달러)도 필요하다. 쓰려면 DB 접근을 HTTPS(REST)로 바꿔야 해서 '직접 SQL' 결정과 부딪친다.
