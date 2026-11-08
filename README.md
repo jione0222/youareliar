@@ -30,7 +30,7 @@
 
 ## 앞으로 할 것
 1. 실제 물건 사진을 모아서 정확도 시험 돌리기 (아래 '정확도 시험')
-2. 학교에서 운영할 방법(배포) 정하기
+2. 오라클 무료 서버에 올려서 늘 켜 두기 (아래 '오라클 무료 서버에 올리기')
 
 ## 폴더 구조
 ```
@@ -44,7 +44,6 @@ app/
   search.py      AI 검색: 사진 벡터·설명 벡터·키워드 순위를 합치기(RRF)
   rerank.py      재순위: Claude가 상위 후보를 다시 줄 세우고 이유 쓰기
   evaluate.py    정확도 시험: 검색 방법별 정답률 재기
-eval/            정확도 시험 자료 (photos/ 사진, queries.csv 표)
   indexing.py    등록할 때 벡터 만들기·Claude 정리 맡기기, 빠진 것 채우기
   describe.py    Claude API로 사진을 보고 특징 정리하기 (B 방식)
   admin.py       관리자 화면: 로그인, 숨기기·지우기·주인 찾음·사진 확인
@@ -55,6 +54,8 @@ eval/            정확도 시험 자료 (photos/ 사진, queries.csv 표)
   templates/     화면(HTML)
   static/        화면 꾸미기(CSS)
 db/migrations/   DB 구조를 바꾼 기록(SQL 파일, 번호 순서대로 적용)
+eval/            정확도 시험 자료 (photos/ 사진, queries.csv 표)
+deploy/          서버에 올리기: setup_server.sh (우분투 서버에 설치하고 늘 켜 두기)
 ```
 
 ## 처음 한 번 설정하기
@@ -192,6 +193,96 @@ python -m app.evaluate
 - 끌 때는 그 창을 닫으면 돼요.
 - 인터넷에 계속 열어 두면 장난으로 Claude 사용료를 써 버릴 수 있어서, 하루 한도가 있어요: 사진 정리 `DESCRIBE_DAILY_LIMIT`(기본 100번), 재순위 `RERANK_DAILY_LIMIT`(기본 200번). 한도를 넘은 사진은 다음 날 자동으로 이어서 정리해요.
 - 서버를 켜 둔 동안 30분마다 빠진 벡터·설명을 다시 확인해서 채워요.
+
+## 오라클 무료 서버에 올리기 (내 컴퓨터를 꺼도 되는 방법)
+오라클이 무료로 빌려주는 서버(인터넷에 늘 켜져 있는 컴퓨터)에 사이트를 올립니다. 데이터는 지금처럼 Supabase에 있고 서버는 계산만 해서, 서버에 문제가 생겨도 데이터는 안전해요. 새 서버를 만들어 다시 설치하면 돼요.
+
+순서: 가입 → 서버 만들기 → 접속 → 코드 받기 → `.env` 복사 → 설치 → 사이트 주소 만들기
+
+### 1. 오라클 가입 (팀에서 한 명)
+- https://signup.cloud.oracle.com 에서 가입합니다.
+- **Home Region은 `South Korea Central (Seoul)`** 을 고르세요. 나중에 바꿀 수 없고, 무료 서버는 이 지역에만 만들 수 있어요. Supabase도 서울이라 가장 빨라요.
+- 휴대폰 인증과 **카드 본인 확인**이 있어요. 확인용으로 잠깐 결제됐다가 취소되고, 무료 한도 안에서는 돈이 나가지 않아요. 카드 주인(예: 부모님)과 함께 가입하세요.
+
+### 2. 서버 만들기
+1. 왼쪽 위 메뉴 → **Compute → Instances → Create instance**
+2. **Name**: `lostfound`
+3. **Image**: Change image → **Canonical Ubuntu 24.04**
+4. **Shape**: Change shape → **Ampere → VM.Standard.A1.Flex** → OCPU **2**, Memory **12** GB ("Always Free-eligible" 표시를 확인)
+   - 처음 골라져 있는 `VM.Standard.E2.1.Micro`(메모리 1GB)로는 AI 모델이 안 돌아가요. 꼭 바꾸세요.
+   - 왜 12GB인가요: 오라클은 7일 동안 CPU·네트워크·메모리를 모두 20%보다 적게 쓰는 무료 서버를 '노는 서버'로 보고 회수할 수 있어요. 우리 서버는 메모리를 3GB 넘게 써서 12GB의 25~30%가 돼요. 24GB로 만들면 20%가 안 돼서 회수될 수 있어요.
+5. **Networking**: 그대로 두고, `Assign a public IPv4 address`가 켜져 있는지만 확인
+6. **Add SSH keys**: `Generate a key pair for me` → **Download private key**. 이 파일이 서버 열쇠예요. 잃어버리면 접속할 수 없어요.
+7. **Create**. `Out of capacity`(자리 없음)가 나오면 몇 시간 뒤 다시 하거나, OCPU 1·메모리 6GB로 해 보세요.
+8. 상태가 **Running**이 되면 **Public IP address**(예: `152.70.12.34`)를 적어 둡니다.
+
+### 3. 노트북에서 서버에 접속하기 (PowerShell)
+열쇠 파일을 정해진 곳으로 옮깁니다(파일 이름은 받은 이름으로 바꾸세요).
+```powershell
+mkdir $HOME\.ssh -Force
+```
+```powershell
+Move-Item $HOME\Downloads\ssh-key-2026-11-08.key $HOME\.ssh\oracle.key
+```
+접속합니다(`공인IP` 자리에 2-8의 주소).
+```powershell
+ssh -i $HOME\.ssh\oracle.key ubuntu@공인IP
+```
+- 처음에 `Are you sure you want to continue connecting`이 나오면 `yes`
+- 줄 맨 앞이 `ubuntu@lostfound:~$`로 바뀌면 서버 안이에요. 이제부터 치는 명령은 서버에서 실행돼요. 나올 때는 `exit`.
+- `UNPROTECTED PRIVATE KEY FILE` 또는 `bad permissions` 오류가 나면, 아래를 한 번 실행하고 다시 접속하세요.
+  ```powershell
+  icacls $HOME\.ssh\oracle.key /inheritance:r /grant:r "$($env:USERNAME):(R)"
+  ```
+
+### 4. 서버에 코드 받기 (서버에서)
+```bash
+git clone https://github.com/jione0222/youareliar.git
+```
+
+### 5. `.env` 복사하기 (노트북에서)
+`.env`는 깃에 없어서 직접 옮겨야 해요. **새 PowerShell 창**을 열고 프로젝트 폴더로 간 뒤:
+```powershell
+scp -i $HOME\.ssh\oracle.key .env ubuntu@공인IP:~/youareliar/.env
+```
+노트북에서 잘 되던 `.env`를 그대로 쓰면 돼요.
+
+### 6. 설치하기 (서버에서)
+```bash
+bash ~/youareliar/deploy/setup_server.sh
+```
+- 처음에는 10~20분 걸려요. 마지막에 `다 됐어요!`가 나오면 성공이에요.
+- 서버 기록 보기: `sudo journalctl -u lostfound -f` → `DB에 연결했어요.`와 `AI 모델(...)을 다 불러왔어요.`가 보이면 준비 끝(처음에는 모델을 내려받느라 몇 분). 그만 보려면 Ctrl+C.
+- 이제 서버 컴퓨터가 다시 켜지거나 서버가 멈춰도 알아서 다시 켜져요.
+
+### 7. 사이트 주소 만들기 (Tailscale, 서버에서)
+Tailscale이 `https://lostfound.xxxx.ts.net` 같은 무료 고정 주소를 만들어 줘요. 서버의 문(포트)을 따로 열지 않아도 돼요.
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+```bash
+sudo tailscale up --hostname lostfound
+```
+나오는 주소를 노트북 브라우저에서 열고 로그인(구글 계정 등) → **Connect**.
+```bash
+sudo tailscale funnel --bg 8000
+```
+- 처음에는 `Funnel is not enabled`와 함께 주소가 나와요. 그 주소를 열어 **Enable**을 누르고, 같은 명령을 다시 실행하세요.
+- `Available on the internet:` 아래의 `https://...ts.net/`이 사이트 주소예요. 휴대폰으로 열어 보세요(처음에는 몇 초 걸릴 수 있어요).
+- 서버를 다시 켜도 주소는 그대로예요.
+
+### 8. 다 됐으면
+- 노트북 서버는 꺼도 돼요. 둘 다 켜 두면 같은 일을 두 번 해서 Claude 사용료가 더 나올 수 있어요.
+- 새 코드를 받을 때(서버에 접속해서):
+  ```bash
+  cd ~/youareliar && git pull && bash deploy/setup_server.sh
+  ```
+- `.env`를 바꿨을 때: 노트북에서 5번으로 다시 복사한 뒤, 서버에서 `sudo systemctl restart lostfound`
+
+### 서버에서 문제가 생겼을 때
+- 사이트가 안 열려요 → 서버 상태 `sudo systemctl status lostfound`, 최근 기록 50줄 `sudo journalctl -u lostfound -n 50`, 주소 상태 `tailscale funnel status`
+- `[DB 연결 실패]` → 안내대로 노트북의 `.env`를 고친 뒤 위의 '.env를 바꿨을 때'처럼 하세요.
+- 오라클에서 'idle(노는) 인스턴스' 메일이 오면 → 회수되기 전에 알려 주세요.
 
 ## 새 코드를 받았을 때
 ```bash

@@ -35,6 +35,25 @@ pool = ConnectionPool(
 )
 
 
+# DB에 연결하지 못했을 때: 오류 글자에 들어 있는 말 → 고치는 방법 (자주 나오는 것만)
+CONNECTION_HINTS = [
+    (("password authentication failed",), "DATABASE_URL의 비밀번호가 틀렸어요. 대괄호 [ ]까지 지우고 비밀번호만 넣었는지 확인하세요."),
+    (("Tenant or user not found",), "DATABASE_URL의 사용자 이름이 틀렸어요. Supabase의 Connect → Session pooler 주소를 다시 복사하세요."),
+    (("failed to resolve host", "could not translate host name", "getaddrinfo failed"), "DATABASE_URL의 주소(@ 뒤쪽)가 틀렸거나 인터넷이 끊겼어요."),
+    (("Network is unreachable",), "DB 주소로 가는 길이 없어요. Supabase의 Direct connection 주소 대신 Session pooler 주소를 쓰세요."),
+    (("timeout expired",), "10초 안에 연결되지 않았어요. 인터넷이 느리거나, 이 서버에서 DB 포트(5432)로 나가는 연결이 막혀 있어요. (Hugging Face Spaces는 80·443·8080 포트만 열려 있어서 안 돼요.)"),
+    (("Connection refused",), "DB가 꺼져 있거나 주소·포트가 틀렸어요. 이 컴퓨터의 Postgres를 쓴다면 켜져 있는지 확인하세요."),
+]
+
+
+def connection_hint(error: str) -> str:
+    """DB 연결 오류 글자를 보고 고치는 방법을 한국어로 돌려준다."""
+    return next(
+        (hint for words, hint in CONNECTION_HINTS if any(word in error for word in words)),
+        "DATABASE_URL 값을 다시 확인하세요.",
+    )
+
+
 def check_connection() -> str | None:
     """DB에 실제로 한 번 연결해 본다. 되면 None, 안 되면 오류 내용을 돌려준다(서버를 켤 때 확인용)."""
     try:

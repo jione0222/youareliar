@@ -12,13 +12,18 @@ from pathlib import Path
 import psycopg
 from storage3.exceptions import StorageApiError
 
-from . import config, storage
+from . import config, db, storage
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "db" / "migrations"
 
 
 def apply_sql_migrations() -> None:
-    with psycopg.connect(config.DATABASE_URL, prepare_threshold=None) as conn:
+    try:
+        conn = psycopg.connect(config.DATABASE_URL, prepare_threshold=None, connect_timeout=10)
+    except psycopg.OperationalError as error:
+        message = str(error).strip()
+        raise SystemExit(f"\n[DB 연결 실패] {db.connection_hint(message)}\n  오류 내용: {message.splitlines()[0]}\n")
+    with conn:
         conn.execute(
             """
             create table if not exists schema_migrations (

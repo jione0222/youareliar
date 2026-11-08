@@ -1,2 +1,4 @@
 # Windows batch files need CRLF line endings
 *.bat text eol=crlf
+# Shell scripts run on the Linux server and need LF line endings
+*.sh text eol=lf
