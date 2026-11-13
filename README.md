@@ -30,7 +30,7 @@
 
 ## 앞으로 할 것
 1. 실제 물건 사진을 모아서 정확도 시험 돌리기 (아래 '정확도 시험')
-2. 오라클 무료 서버에 올려서 늘 켜 두기 (아래 '오라클 무료 서버에 올리기')
+2. Google Cloud Run에 올려서 늘 켜 두기 (아래 'Google Cloud Run에 올리기')
 
 ## 폴더 구조
 ```
@@ -55,6 +55,7 @@ app/
   static/        화면 꾸미기(CSS)
 db/migrations/   DB 구조를 바꾼 기록(SQL 파일, 번호 순서대로 적용)
 eval/            정확도 시험 자료 (photos/ 사진, queries.csv 표)
+Dockerfile       Google Cloud Run에 올릴 서버 이미지 설명서 (AI 모델까지 미리 넣어 둔다)
 deploy/          서버에 올리기: setup_server.sh (우분투 서버에 설치하고 늘 켜 두기)
 ```
 
@@ -194,98 +195,42 @@ python -m app.evaluate
 - 인터넷에 계속 열어 두면 장난으로 Claude 사용료를 써 버릴 수 있어서, 하루 한도가 있어요: 사진 정리 `DESCRIBE_DAILY_LIMIT`(기본 100번), 재순위 `RERANK_DAILY_LIMIT`(기본 200번). 한도를 넘은 사진은 다음 날 자동으로 이어서 정리해요.
 - 서버를 켜 둔 동안 30분마다 빠진 벡터·설명을 다시 확인해서 채워요.
 
-## 오라클 무료 서버에 올리기 (내 컴퓨터를 꺼도 되는 방법)
-오라클이 무료로 빌려주는 서버(인터넷에 늘 켜져 있는 컴퓨터)에 사이트를 올립니다. 데이터는 지금처럼 Supabase에 있고 서버는 계산만 해서, 서버에 문제가 생겨도 데이터는 안전해요. 새 서버를 만들어 다시 설치하면 돼요.
+## Google Cloud Run에 올리기 (내 컴퓨터를 꺼도 되는 방법)
+구글 클라우드가 깃허브 저장소의 `Dockerfile`을 읽어서 서버를 만들고 켜 줘요. 리눅스 서버를 직접 다룰 일이 없고, 코드를 깃허브에 올리면 알아서 다시 배포돼요. 데이터는 지금처럼 Supabase에 있어요.
 
-순서: 가입 → 서버 만들기 → 접속 → 코드 받기 → `.env` 복사 → 설치 → 사이트 주소 만들기
+### 1. 구글 클라우드 가입 (팀에서 한 명)
+- https://console.cloud.google.com 에 구글 계정으로 들어가서 **무료로 시작하기(Start free)** 를 누르고 결제 정보(카드)를 등록해요. 카드 주인(예: 부모님)과 함께 하세요.
+- 처음 가입하면 **90일 동안 쓸 수 있는 300달러 크레딧**이 생겨요. 프로젝트(My First Project)도 하나 자동으로 생기니 그대로 써요.
 
-### 1. 오라클 가입 (팀에서 한 명)
-- https://signup.cloud.oracle.com 에서 가입합니다.
-- **Home Region(홈 영역)은 `Japan Central (Osaka)`** 를 고르세요. 없으면 `Japan East (Tokyo)`를 고르세요.
-  - 한국(서울)은 새로 가입할 때 고를 수 없어요. 춘천이 보여도 고르지 마세요. 춘천에서는 무료 ARM 서버(A1)를 만들 수 없어요.
-  - 일본은 Supabase(서울)와 가까워서, 서버가 DB에 한 번 다녀오는 데 0.03초 정도만 더 걸려요.
-  - 홈 영역은 나중에 바꿀 수 없고, 무료 서버는 이 지역에만 만들 수 있어요.
-- 휴대폰 인증과 **카드 본인 확인**이 있어요. 확인용으로 잠깐 결제됐다가 취소되고, 무료 한도 안에서는 돈이 나가지 않아요. 카드 주인(예: 부모님)과 함께 가입하세요.
+### 2. 예산 알림 만들기 (돈이 나가기 전에 메일 받기)
+- 메뉴 → **결제(Billing) → 예산 및 알림(Budgets & alerts) → 예산 만들기**
+- 금액은 예를 들어 1만 원, 알림은 50%·90%·100%로 둬요. 알림 메일만 오고 자동으로 멈추지는 않아요.
 
-### 2. 서버 만들기
-1. 왼쪽 위 메뉴 → **Compute → Instances → Create instance**
-2. **Name**: `lostfound`
-3. **Image**: Change image → **Canonical Ubuntu 24.04**
-4. **Shape**: Change shape → **Ampere → VM.Standard.A1.Flex** → OCPU **2**, Memory **12** GB ("Always Free-eligible" 표시를 확인)
-   - 처음 골라져 있는 `VM.Standard.E2.1.Micro`(메모리 1GB)로는 AI 모델이 안 돌아가요. 꼭 바꾸세요.
-   - 왜 12GB인가요: 오라클은 7일 동안 CPU·네트워크·메모리를 모두 20%보다 적게 쓰는 무료 서버를 '노는 서버'로 보고 회수할 수 있어요. 우리 서버는 메모리를 3GB 넘게 써서 12GB의 25~30%가 돼요. 24GB로 만들면 20%가 안 돼서 회수될 수 있어요.
-5. **Networking**: 그대로 두고, `Assign a public IPv4 address`가 켜져 있는지만 확인
-6. **Add SSH keys**: `Generate a key pair for me` → **Download private key**. 이 파일이 서버 열쇠예요. 잃어버리면 접속할 수 없어요.
-7. **Create**. `Out of capacity`(자리 없음)가 나오면 몇 시간 뒤 다시 하거나, OCPU 1·메모리 6GB로 해 보세요.
-8. 상태가 **Running**이 되면 **Public IP address**(예: `152.70.12.34`)를 적어 둡니다.
+### 3. Cloud Run 서비스 만들기
+1. 위쪽 검색창에 `Cloud Run`을 쳐서 들어가요. 'API 사용 설정'이 나오면 누르세요.
+2. **서비스 만들기(Create service)** → **저장소에서 지속적으로 배포(Continuously deploy from a repository)** → **Cloud Build로 설정(Set up with Cloud Build)**
+   - 저장소: GitHub → 로그인 → `jione0222/youareliar`
+   - 브랜치: `^claude/new-session-mppssv$`
+   - 빌드 유형: **Dockerfile** (위치 `/Dockerfile`)
+3. 서비스 이름 `lostfound`, 지역(Region) **asia-northeast3 (서울)** — Supabase도 서울이라 빨라요.
+4. 인증: **공개 액세스 허용(Allow public access)**
+5. 결제(Billing): **인스턴스 기반(Instance-based)** — 화면을 보여 준 뒤에도 Claude 사진 정리 같은 뒷일을 계속하려면 필요해요.
+6. 확장(Scaling): 최소 인스턴스 **0**, 최대 인스턴스 **1**
+7. **컨테이너(Container)** 설정을 펼쳐서:
+   - 포트 `8080` (기본값 그대로)
+   - 메모리 **4 GiB**, CPU **2**
+   - **시작 CPU 부스트(Startup CPU boost)** 켜기
+8. **변수 및 보안 비밀(Variables & Secrets)** → 환경 변수에 노트북 `.env`의 값을 하나씩 넣어요: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, `ADMIN_PASSWORD` (쓰고 있다면 `CLAUDE_RERANK_MODEL`, `STORAGE_BUCKET`, 한도 값도)
+9. **만들기(Create)** — 처음 빌드는 10~20분 걸려요.
+10. 위쪽에 나오는 **URL**(`https://lostfound-….run.app`)이 사이트 주소예요. **로그(Logs)** 탭에 `DB에 연결했어요.`가 보이면 정상이에요.
 
-### 3. 노트북에서 서버에 접속하기 (PowerShell)
-열쇠 파일을 정해진 곳으로 옮깁니다(파일 이름은 받은 이름으로 바꾸세요).
-```powershell
-mkdir $HOME\.ssh -Force
-```
-```powershell
-Move-Item $HOME\Downloads\ssh-key-2026-11-08.key $HOME\.ssh\oracle.key
-```
-접속합니다(`공인IP` 자리에 2-8의 주소).
-```powershell
-ssh -i $HOME\.ssh\oracle.key ubuntu@공인IP
-```
-- 처음에 `Are you sure you want to continue connecting`이 나오면 `yes`
-- 줄 맨 앞이 `ubuntu@lostfound:~$`로 바뀌면 서버 안이에요. 이제부터 치는 명령은 서버에서 실행돼요. 나올 때는 `exit`.
-- `UNPROTECTED PRIVATE KEY FILE` 또는 `bad permissions` 오류가 나면, 아래를 한 번 실행하고 다시 접속하세요.
-  ```powershell
-  icacls $HOME\.ssh\oracle.key /inheritance:r /grant:r "$($env:USERNAME):(R)"
-  ```
+### 알아 둘 점
+- **새 코드**: 그 브랜치에 새 코드가 올라가면 자동으로 다시 빌드하고 바꿔 켜요(10~20분).
+- **첫 접속**: 한동안 아무도 안 들어오면 서버가 꺼졌다가, 다음 사람이 들어올 때 켜져요. 그때 30초~1분 기다릴 수 있어요.
+- **비용**: 처음 90일은 300달러 크레딧으로 내요. 그 뒤로는 서버가 켜져 있는 시간만큼 내요(마지막 접속 뒤 최대 15분쯤 더 켜져 있어요). 학교 낮 시간 내내 켜져 있으면 한 달에 몇만 원이 될 수 있으니 예산 알림을 꼭 만들어 두세요.
+- **노트북 서버와 동시에 켜 두지 않기**: 같은 정리 작업을 두 번 해서 Claude 사용료가 더 나올 수 있어요.
 
-### 4. 서버에 코드 받기 (서버에서)
-```bash
-git clone https://github.com/jione0222/youareliar.git
-```
-
-### 5. `.env` 복사하기 (노트북에서)
-`.env`는 깃에 없어서 직접 옮겨야 해요. **새 PowerShell 창**을 열고 프로젝트 폴더로 간 뒤:
-```powershell
-scp -i $HOME\.ssh\oracle.key .env ubuntu@공인IP:~/youareliar/.env
-```
-노트북에서 잘 되던 `.env`를 그대로 쓰면 돼요.
-
-### 6. 설치하기 (서버에서)
-```bash
-bash ~/youareliar/deploy/setup_server.sh
-```
-- 처음에는 10~20분 걸려요. 마지막에 `다 됐어요!`가 나오면 성공이에요.
-- 서버 기록 보기: `sudo journalctl -u lostfound -f` → `DB에 연결했어요.`와 `AI 모델(...)을 다 불러왔어요.`가 보이면 준비 끝(처음에는 모델을 내려받느라 몇 분). 그만 보려면 Ctrl+C.
-- 이제 서버 컴퓨터가 다시 켜지거나 서버가 멈춰도 알아서 다시 켜져요.
-
-### 7. 사이트 주소 만들기 (Tailscale, 서버에서)
-Tailscale이 `https://lostfound.xxxx.ts.net` 같은 무료 고정 주소를 만들어 줘요. 서버의 문(포트)을 따로 열지 않아도 돼요.
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-```
-```bash
-sudo tailscale up --hostname lostfound
-```
-나오는 주소를 노트북 브라우저에서 열고 로그인(구글 계정 등) → **Connect**.
-```bash
-sudo tailscale funnel --bg 8000
-```
-- 처음에는 `Funnel is not enabled`와 함께 주소가 나와요. 그 주소를 열어 **Enable**을 누르고, 같은 명령을 다시 실행하세요.
-- `Available on the internet:` 아래의 `https://...ts.net/`이 사이트 주소예요. 휴대폰으로 열어 보세요(처음에는 몇 초 걸릴 수 있어요).
-- 서버를 다시 켜도 주소는 그대로예요.
-
-### 8. 다 됐으면
-- 노트북 서버는 꺼도 돼요. 둘 다 켜 두면 같은 일을 두 번 해서 Claude 사용료가 더 나올 수 있어요.
-- 새 코드를 받을 때(서버에 접속해서):
-  ```bash
-  cd ~/youareliar && git pull && bash deploy/setup_server.sh
-  ```
-- `.env`를 바꿨을 때: 노트북에서 5번으로 다시 복사한 뒤, 서버에서 `sudo systemctl restart lostfound`
-
-### 서버에서 문제가 생겼을 때
-- 사이트가 안 열려요 → 서버 상태 `sudo systemctl status lostfound`, 최근 기록 50줄 `sudo journalctl -u lostfound -n 50`, 주소 상태 `tailscale funnel status`
-- `[DB 연결 실패]` → 안내대로 노트북의 `.env`를 고친 뒤 위의 '.env를 바꿨을 때'처럼 하세요.
-- 오라클에서 'idle(노는) 인스턴스' 메일이 오면 → 회수되기 전에 알려 주세요.
+(참고) 우분투 서버를 직접 빌려 쓸 때는 `deploy/setup_server.sh`가 설치와 늘 켜 두기 설정을 한 번에 해 줘요(오라클 무료 서버용으로 만들었다가 자리가 없어서 그만뒀어요).
 
 ## 새 코드를 받았을 때
 ```bash

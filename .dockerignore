@@ -1,0 +1,11 @@
+# 서버 이미지에 넣지 않을 것 (비밀값, 내 컴퓨터 전용 파일, 시험 자료)
+.git
+.env
+.venv/
+__pycache__/
+*.pyc
+uploads/
+logs/
+eval/photos/
+eval/cache/
+eval/results/
