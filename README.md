@@ -299,6 +299,25 @@ python -m app.migrate
 ```
 라이브러리와 DB 구조가 바뀌었을 수 있어서 세 줄을 차례로 실행한 뒤 서버를 켭니다. 바뀐 게 없으면 '이미 설치됨', '건너뜀'으로 금방 끝나요.
 
+## 팀원에게 잠깐 보여 주기 (임시 주소)
+노트북에서 서버를 켠 채로 Cloudflare의 '임시 터널'을 쓰면, 인터넷 어디서나 들어올 수 있는 임시 주소가 생겨요. 가입은 필요 없어요.
+1. 서버를 평소처럼 켭니다.
+   ```bash
+   uvicorn app.main:app
+   ```
+2. 처음 한 번만 cloudflared를 설치합니다(다른 PowerShell 창에서). 설치가 끝나면 그 창을 닫고 새로 엽니다.
+   ```bash
+   winget install --id Cloudflare.cloudflared
+   ```
+3. 새 PowerShell 창에서 임시 주소를 만듭니다.
+   ```bash
+   cloudflared tunnel --url http://localhost:8000
+   ```
+4. 화면에 나오는 `https://….trycloudflare.com` 주소를 팀원에게 보냅니다.
+- 서버 창과 cloudflared 창을 둘 다 켜 두고, 노트북이 잠들지 않게 하세요. 끝낼 때는 두 창에서 Ctrl+C.
+- 주소는 켤 때마다 바뀌어요. 주소를 아는 사람은 누구나 들어올 수 있으니 팀원에게만 보내세요.
+- 연결이 안 되면 `cloudflared tunnel --protocol http2 --url http://localhost:8000`으로 해 보세요.
+
 ## 휴대폰으로 접속하기 (같은 와이파이)
 1. 서버를 이렇게 켭니다(같은 와이파이의 다른 기기도 들어올 수 있게).
    ```bash
