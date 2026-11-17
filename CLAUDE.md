@@ -60,6 +60,10 @@
 - **만드는 순서:** 등록 → 목록 → A 검색 → B 추가 → 재순위. 단계마다 실행해 확인한다.
 - **배포(2026-11-13 변경): Google Cloud Run(서울 asia-northeast3, 깃허브 저장소에서 Cloud Build로 자동 배포).** 팀이 '내 컴퓨터를 꺼도 되게' 늘 열어 두기와 '많이 쓰는 대중적인 서비스'를 원했다. 오라클 무료 서버는 A1 자리가 계속 없고(Out of capacity) 로그인도 막혀서 그만뒀다. Hugging Face Spaces는 DB 포트가 막혀서 뺐다.
 - 비밀값은 `.env` 파일에만 넣고 깃에 올리지 않는다(`.env.example`만 올린다).
+- **기능 추가(2026-11-17, 팀 요청):** 사진 자르기, 뒤로 가기, 정렬(최신·오래된·조회순), 종류 필터, 화면 색 고르기, 습득자 연락처(선택), 등록한 사람의 자기 물건 관리, 찾아간 사람(이름·학번) 기록.
+  - 습득자 연락처는 **로그인한 사람에게만** 보인다(팀 결정). '주의할 점'의 '보관 장소에서 선생님 확인 뒤 돌려준다' 안내는 상세 화면에 그대로 둔다.
+  - 물건 종류는 8가지로 정했다: 의류 / 전자기기 / 학용품 / 물병·텀블러 / 가방·지갑 / 액세서리 / 운동용품 / 기타.
+  - '로그인한 사람만 사이트를 쓸 수 있게'는 요청했다가 취소했다. 사이트는 누구나 쓴다.
 
 ## 개발 메모
 - 설정·실행 방법은 README.md에 있다. 서버 실행: `uvicorn app.main:app --reload`, DB 준비: `python -m app.migrate`.
@@ -77,7 +81,7 @@
 - 관리자 기능(2026-11-05): `app/admin.py`. `.env`의 `ADMIN_PASSWORD`(8자 이상)로 로그인하면 비밀번호로 서명한(HMAC) 쿠키를 준다(경로 /admin, HttpOnly, SameSite=Lax, 7일). 작업은 모두 POST 폼. 숨기기(hidden), 주인 찾음(status), 사진 공개 확인(`privacy_reviewed`, 마이그레이션 004), 지우기(사진 파일과 벡터까지). 템플릿 공통 설정은 `app/templating.py`.
 - B 검색(2026-11-07): `app/search.py`가 사진 벡터(SigLIP 2)·설명 벡터(KURE-v1, `nlpai-lab/KURE-v1`)·키워드(두 글자 조각 겹침) 순위를 RRF(k=60, 비중 1:1:0.5)로 합친다. 설명 벡터는 `describe.document_for_search()` 글로 만들어 `item_vectors`(kind=description)에 저장. 설명 검색 모델은 Claude 키가 있거나 설명이 하나라도 있을 때만 불러온다(메모리 절약, 서버 합계 약 2.8GB). `/search?...&debug=1`이면 방법별 등수를 보여 준다.
 - 설명 벡터 모델 비교(Claude식 설명 24개, 쉬운 문제 40·의역 문제 22): KURE-v1 1등 100%/91%, e5-base 95%/82%, Qwen3-Embedding-0.6B 100%/77%, SigLIP 2 글자 부분 63%/41%, 키워드 98%/77%. 설명+키워드 RRF는 키워드 비중 0.5 이하에서 설명만 쓸 때와 같았다(96.8%). 사진 벡터 비중은 실제 사진 정확도 시험에서 다시 정한다. 시험 자료는 제가 직접 쓴 것이라 실제보다 쉬울 수 있다.
-- 회원가입·로그인(2026-11-07, 팀 요청: 학교·이메일 인증 없이 기능만): `app/auth.py`(scrypt 비밀번호 해시, DB에 세션 토큰의 sha256만 저장, 쿠키 `session` HttpOnly·SameSite=Lax·30일), `app/accounts.py`(/signup, /login, /logout, `next`는 사이트 안 주소만 허용). 마이그레이션 005: users, sessions, items.user_id(로그인한 등록자). 관리자 로그인(ADMIN_PASSWORD)과는 따로다. 로그인은 아직 아무 기능도 막지 않는다.
+- 회원가입·로그인(2026-11-07, 팀 요청: 학교·이메일 인증 없이 기능만): `app/auth.py`(scrypt 비밀번호 해시, DB에 세션 토큰의 sha256만 저장, 쿠키 `session` HttpOnly·SameSite=Lax·30일), `app/accounts.py`(/signup, /login, /logout, `next`는 사이트 안 주소만 허용). 마이그레이션 005: users, sessions, items.user_id(로그인한 등록자). 관리자 로그인(ADMIN_PASSWORD)과는 따로다. 로그인은 습득자 연락처 보기와 '내가 등록한 물건' 관리에만 쓴다.
 - 서버가 AI 모델을 불러올 때 '준비 운동'으로 한 번 계산해 둔다. 안 하면 켠 뒤 첫 검색이 몇십 초 걸릴 수 있다.
 - 개인정보 사진 가리기(2026-11-07, 팀 결정으로 끔): `.env`의 `HIDE_PRIVATE_PHOTOS`(기본 false). 꺼져 있으면 사진을 그대로 보여 주고, Claude가 얼굴·개인정보를 봤다고 표시한 물건은 관리자 화면에서만 '개인정보 의심'으로 알린다. '주의할 점'의 개인정보 항목과 다르므로, 학교에서 운영하기 전에 선생님과 다시 정한다.
 - 재순위(2026-11-07): `app/rerank.py`. 검색 화면이 합친 결과를 먼저 보여 주고, 자바스크립트가 `/search/rerank?q=&ids=`(상위 10개)를 불러 Claude가 정한 순서·가능성(high/medium/low)·이유로 카드를 바꿔 끼운다. 후보 정보는 `<candidate>` 태그로 감싸 지시로 따르지 않게 한다. 30분 캐시, 하루 한도 `RERANK_DAILY_LIMIT`(기본 200), 재순위 전용 모델 `CLAUDE_RERANK_MODEL`(비우면 CLAUDE_MODEL). Claude가 없는 번호·중복을 주면 걸러 내고 빠진 후보는 원래 순서로 뒤에 붙인다. `&debug=1`이면 'Claude n등'도 덧붙는다.
@@ -92,4 +96,13 @@
 - Cloud Run 배포(2026-11-13): 저장소 맨 위 `Dockerfile`. 기본 이미지는 `mirror.gcr.io/library/python:3.13-slim`(Docker Hub 요청 제한 피하기), CPU 전용 torch(download.pytorch.org/whl/cpu, 실패하면 PyPI) 뒤 requirements, 모델을 `snapshot_download(allow_patterns=['*.json','model.safetensors'])`로 이미지에 넣고(3.6GB) `HF_HUB_OFFLINE=1`, `OMP_NUM_THREADS=2`. CMD는 JSON 형식 `sh -c "exec uvicorn … --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips '*'"`. `.dockerignore`로 `.env`·`.venv` 등을 뺀다. 이 환경에서 확인한 것: 새 캐시에 받은 파일만으로 오프라인 모델 로딩 성공(검색 문장 하나에 SigLIP 2 약 85ms, KURE-v1 약 160~190ms, 2스레드), PORT=8080·프록시 헤더로 서버 실행과 `X-Forwarded-Proto: https`일 때 Secure 쿠키, `docker build --check` 경고 없음. 이미지 전체 빌드는 못 해 봤다(CPU 전용 torch 주소 막힘, 디스크 부족). README 'Google Cloud Run에 올리기'에 콘솔 순서가 있다.
 - Cloud Run 설정: 서울, 공개 접근, 인스턴스 기반 결제(warm_up·30분 채우기·등록 뒤 Claude 정리가 응답 밖에서 CPU를 써야 함), 최소 0·최대 1 인스턴스, 2 vCPU·4 GiB, 시작 CPU 부스트, 환경 변수는 콘솔에 넣는다. 인스턴스 기반은 인스턴스가 켜진 시간(마지막 요청 뒤 최대 약 15분 포함)만큼 낸다. 처음 90일은 300달러 크레딧. 비용을 줄이려면 나중에 요청 기반 결제로 바꿀 수 있지만, 그러려면 모델을 시작할 때 다 불러오고, Claude 정리를 등록 요청 안에서 하고, 뒤에서 도는 채우기를 없애야 한다.
 - 서버가 켜질 때 DB에 실제로 연결해 보고(`db.check_connection`, 10초 제한), 안 되면 오류 종류별 고치는 방법을 `[DB 연결 실패]`로 서버 기록에 남긴다(`db.CONNECTION_HINTS`, `db.connection_hint`). `python -m app.migrate`도 같은 안내를 보여 준다. 연결 풀도 `connect_timeout` 10초.
-
+- 기능 추가(2026-11-17): 마이그레이션 006(items.view_count, category, finder_name, finder_phone), 007(claimant_name, claimant_student_id, returned_at).
+  - 서버가 켜질 때 `main._prepare_db()`가 DB 확인 뒤 `migrate.apply_sql_migrations()`를 부른다(`pg_advisory_lock`으로 한 대씩). 그래서 Cloud Run에 올리면 DB 구조가 알아서 바뀐다. `python -m app.migrate`도 그대로 된다.
+  - 종류: `app/categories.py`의 `Group`(Literal 8개)을 Claude 결과 모양 `ItemDescription.group`에도 쓴다. 우선순위는 등록한 사람이 고른 것 > Claude가 고른 것(`save_description`의 `coalesce`) > 낱말로 짐작(`categories.guess`, `indexing.backfill_categories`가 30분마다 빈 칸만 채움; Claude가 봤는데 단서가 없으면 기타). 목록 `?cat=`, 검색 `&cat=`(벡터·키워드 검색 모두 SQL에서 거른다).
+  - 정렬: `db.SORTS`(new/old/views), 목록 `?sort=`. 조회 수는 상세 화면을 열 때 +1(방금 등록한 것과 등록한 사람이 본 것은 세지 않음).
+  - 사진 자르기: Cropper.js 1.6.2(MIT)를 `app/static/vendor/cropperjs-1.6.2/`에 넣었다(외부 CDN 안 씀). 고른 파일을 잘라 JPEG로 만든 뒤 DataTransfer로 file input에 바꿔 끼우고 보낸다. 못 하는 브라우저면 원래 사진을 보낸다. EXIF 방향은 Cropper의 checkOrientation이 처리한다.
+  - 화면 색: style.css의 `--h/--s/--l/--dl/--tl/--dtl` 숫자로 강조색을 만들고, `[data-accent]`(6색)와 `[data-mode=light|dark]`가 바꾼다. 색마다 명암비 4.5 이상이 되게 밝기를 계산했다. localStorage(`theme-accent`, `theme-mode`)에 저장하고 head의 짧은 스크립트가 먼저 적용한다.
+  - 연락처: 등록 때 이름·전화번호(선택) + 공개 동의 체크 필수, 전화번호는 `main.normalize_phone`으로 010-1234-5678 모양. Claude나 검색 글에는 넣지 않는다.
+  - 내 물건 관리(`app/mine.py`, `/my`): `items.user_id`가 나인 물건만(남의 것은 403). 주인 찾음·숨기기·지우기는 `admin.update_status/update_hidden/remove_item`을 같이 쓴다. 사진 개인정보 확인은 관리자만. 관리 화면 한 줄은 `_manage_item.html`을 관리자와 같이 쓴다. 숨긴 글도 등록한 사람은 상세 화면을 볼 수 있다. 위쪽 막대의 닉네임이 `/my` 링크다.
+  - 찾아간 사람 기록(이름·학번)은 관리자와 등록한 사람만 본다. '보관 중'으로 되돌리면 지운다. 학번은 개인정보라서 얼마나 보관할지 선생님과 정해야 한다.
+  - 시험: Node Playwright(휴대폰 크기)로 28가지를 끝까지 확인했다(자르기 결과 크기·색, 동의 없는 연락처 거절, 조회 수, 필터·정렬, 검색 필터, 뒤로 가기, 테마 유지, 주인 찾음 기록·되돌리기, 숨기기 404, 남의 물건 403, 지우기). 이 환경에는 파이썬 Playwright가 없다.

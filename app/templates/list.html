@@ -7,7 +7,16 @@
   {% include "_search_form.html" %}
 </section>
 
-<h2 class="section-title">최근 등록된 물건</h2>
+<div class="list-head">
+  <h2 class="section-title">등록된 물건</h2>
+  <nav class="sort-tabs" aria-label="정렬">
+    {% for link in sort_links %}
+    <a class="{{ 'active' if link.active }}" href="{{ link.url }}"{% if link.active %} aria-current="true"{% endif %}>{{ link.label }}</a>
+    {% endfor %}
+  </nav>
+</div>
+{% include "_filters.html" %}
+
 {% if items %}
 <ul class="grid">
   {% for item in items %}
@@ -15,6 +24,11 @@
     {% include "_card.html" %}
   {% endfor %}
 </ul>
+{% elif category %}
+<div class="empty">
+  <p>'{{ category }}' 종류로 등록된 물건이 아직 없어요.</p>
+  <a class="btn" href="{{ category_links[0].url }}">전체 보기</a>
+</div>
 {% else %}
 <div class="empty">
   <p>아직 등록된 물건이 없어요.</p>

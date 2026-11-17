@@ -1,0 +1,73 @@
+{# 관리 화면의 물건 한 줄 (관리자 화면과 '내가 등록한 물건'이 같이 쓴다).
+   base: 작업을 보낼 주소 앞부분(/admin/items 또는 /my/items)
+   view: 작업 뒤 돌아갈 보기(관리자 화면만 씀), allow_privacy: 사진 개인정보 확인 버튼(관리자만) #}
+<li id="item-{{ item.id }}" class="admin-item {{ 'is-hidden' if item.hidden }}">
+  <a href="/items/{{ item.id }}"><img src="{{ photo_url(item.thumb_path) }}" alt="{{ item.id }}번 사진" loading="lazy" width="96" height="96"></a>
+  <div class="admin-info">
+    <p class="admin-title">
+      <strong>{{ item.id }}번</strong>
+      {% if item.ai_info %}{{ item.ai_info.category }}{% endif %}
+      {% if item.category %}<span class="badge stored">{{ item.category }}</span>{% endif %}
+    </p>
+    <p class="admin-badges">
+      <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
+      {% if item.hidden %}<span class="badge warn">숨김</span>{% endif %}
+      {% if allow_privacy and privacy_flagged(item) %}
+        {% if item.privacy_reviewed %}<span class="badge stored">개인정보 확인 완료</span>
+        {% elif HIDE_PRIVATE_PHOTOS %}<span class="badge warn">개인정보 의심 · 사진 가림</span>
+        {% else %}<span class="badge warn">개인정보 의심 · 확인해 주세요</span>{% endif %}
+      {% endif %}
+    </p>
+    <p class="card-meta">{{ item.storage_place }} 보관 · {{ item.found_place or "발견 장소 모름" }} · 등록 {{ item.created_at|korean_date }} · 조회 {{ item.view_count }}회</p>
+    {% if item.memo %}<p class="card-meta">메모: {{ item.memo }}</p>{% endif %}
+    {% if item.finder_name or item.finder_phone %}<p class="card-meta">습득자 연락처: {{ item.finder_name or "이름 없음" }} {{ item.finder_phone or "" }}</p>{% endif %}
+    {% if item.status == "returned" %}
+    <p class="card-meta claimant">
+      찾아간 사람: {{ item.claimant_name or "기록 없음" }}{% if item.claimant_student_id %} (학번 {{ item.claimant_student_id }}){% endif %}{% if item.returned_at %} · {{ item.returned_at|korean_date }}{% endif %}
+    </p>
+    {% endif %}
+  </div>
+  <div class="admin-actions">
+    {% if item.status == "stored" %}
+    <details class="return-box">
+      <summary class="btn btn-small">주인 찾음으로</summary>
+      <form class="return-form" method="post" action="{{ base }}/{{ item.id }}/status">
+        <input type="hidden" name="view" value="{{ view }}">
+        <input type="hidden" name="status" value="returned">
+        <p class="hint">찾아간 사람을 적어 두면 나중에 확인할 수 있어요. 이 기록은 관리자와 등록한 사람만 봐요.</p>
+        <label class="field"><span>찾아간 사람 이름</span><input name="claimant_name" maxlength="20" placeholder="예: 홍길동"></label>
+        <label class="field"><span>학번</span><input name="claimant_student_id" maxlength="20" inputmode="numeric" placeholder="예: 10203"></label>
+        <button class="btn btn-small btn-primary" type="submit">주인 찾음으로 바꾸기</button>
+      </form>
+    </details>
+    {% else %}
+    <form method="post" action="{{ base }}/{{ item.id }}/status"
+          onsubmit="return confirm('보관 중으로 되돌리면 찾아간 사람 기록이 지워져요. 바꿀까요?');">
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="status" value="stored">
+      <button class="btn btn-small" type="submit">보관 중으로</button>
+    </form>
+    {% endif %}
+    <form method="post" action="{{ base }}/{{ item.id }}/hidden">
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="hidden" value="{{ 'false' if item.hidden else 'true' }}">
+      <button class="btn btn-small" type="submit">{{ '다시 보이기' if item.hidden else '숨기기' }}</button>
+    </form>
+    {% if allow_privacy and privacy_flagged(item) %}
+    <form method="post" action="{{ base }}/{{ item.id }}/privacy">
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="reviewed" value="{{ 'false' if item.privacy_reviewed else 'true' }}">
+      {% if HIDE_PRIVATE_PHOTOS %}
+      <button class="btn btn-small" type="submit">{{ '사진 다시 가리기' if item.privacy_reviewed else '확인 완료(사진 공개)' }}</button>
+      {% else %}
+      <button class="btn btn-small" type="submit">{{ '다시 확인 필요로' if item.privacy_reviewed else '확인 완료' }}</button>
+      {% endif %}
+    </form>
+    {% endif %}
+    <form method="post" action="{{ base }}/{{ item.id }}/delete"
+          onsubmit="return confirm('{{ item.id }}번을 정말 지울까요? 사진도 함께 지워지고 되돌릴 수 없어요.');">
+      <input type="hidden" name="view" value="{{ view }}">
+      <button class="btn btn-small btn-danger" type="submit">지우기</button>
+    </form>
+  </div>
+</li>

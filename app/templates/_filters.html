@@ -1,0 +1,6 @@
+{# 물건 종류 필터 버튼 (목록·검색 화면 공통). 휴대폰에서는 옆으로 밀어서 본다. #}
+<nav class="filters" aria-label="물건 종류">
+  {% for link in category_links %}
+  <a class="filter{{ ' active' if link.active }}" href="{{ link.url }}"{% if link.active %} aria-current="true"{% endif %}>{{ link.label }}</a>
+  {% endfor %}
+</nav>

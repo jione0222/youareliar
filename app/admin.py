@@ -1,4 +1,4 @@
-"""관리자 화면 (/admin): 장난 글 숨기기·지우기, '주인 찾음' 표시, 가린 사진 확인.
+"""관리자 화면 (/admin): 장난 글 숨기기·지우기, '주인 찾음' 표시(찾아간 사람 기록), 가린 사진 확인.
 
 관리자인지 확인하는 방법
 - .env의 ADMIN_PASSWORD를 아는 사람만 들어올 수 있다.
@@ -105,6 +105,37 @@ def logout():
     return response
 
 
+# ---------- 작업 (관리자 화면과 '내가 등록한 물건'이 함께 쓴다) ----------
+
+
+def update_status(item_id: int, status: str, claimant_name: str = "", claimant_student_id: str = "") -> str:
+    """상태를 바꾸고 결과 메시지를 돌려준다. '주인 찾음'이면 찾아간 사람(이름·학번)도 적는다."""
+    if status not in STATUS_LABELS:
+        raise HTTPException(status_code=400)
+    name = claimant_name.strip()[:20] or None
+    student_id = claimant_student_id.strip()[:20] or None
+    db.set_status(item_id, status, name, student_id)
+    who = f" (찾아간 사람: {name or '이름 없음'}{f', 학번 {student_id}' if student_id else ''})" if status == "returned" else ""
+    return f"{item_id}번을 '{STATUS_LABELS[status]}'(으)로 바꿨어요.{who}"
+
+
+def update_hidden(item_id: int, hidden: bool) -> str:
+    db.set_hidden(item_id, hidden)
+    return f"{item_id}번을 {'숨겼어요' if hidden else '다시 보이게 했어요'}."
+
+
+def remove_item(item_id: int) -> str:
+    """물건과 사진 파일을 지우고 결과 메시지를 돌려준다."""
+    removed = db.delete_item(item_id)
+    if removed is None:
+        return f"{item_id}번은 이미 없어요."
+    try:
+        storage.delete([removed["photo_path"], removed["thumb_path"]])
+    except Exception:
+        log.exception("%s번의 사진 파일을 지우지 못했어요(글은 지워졌어요).", item_id)
+    return f"{item_id}번을 지웠어요."
+
+
 # ---------- 목록과 작업 ----------
 
 
@@ -128,23 +159,27 @@ def admin_home(request: Request, view: str = "all", msg: str = ""):
 
 
 @router.post("/items/{item_id}/status")
-def change_status(request: Request, item_id: int, status: str = Form(...), view: str = Form("all")):
+def change_status(
+    request: Request,
+    item_id: int,
+    status: str = Form(...),
+    claimant_name: str = Form(""),
+    claimant_student_id: str = Form(""),
+    view: str = Form("all"),
+):
     if not is_admin(request):
         return _to_login()
-    if status not in STATUS_LABELS:
-        raise HTTPException(status_code=400)
-    db.set_status(item_id, status)
+    message = update_status(item_id, status, claimant_name, claimant_student_id)
     log.info("관리자: %s번을 '%s'(으)로 바꿈", item_id, STATUS_LABELS[status])
-    return _back(view, f"{item_id}번을 '{STATUS_LABELS[status]}'(으)로 바꿨어요.")
+    return _back(view, message)
 
 
 @router.post("/items/{item_id}/hidden")
 def change_hidden(request: Request, item_id: int, hidden: bool = Form(...), view: str = Form("all")):
     if not is_admin(request):
         return _to_login()
-    db.set_hidden(item_id, hidden)
     log.info("관리자: %s번 %s", item_id, "숨김" if hidden else "다시 보이기")
-    return _back(view, f"{item_id}번을 {'숨겼어요' if hidden else '다시 보이게 했어요'}.")
+    return _back(view, update_hidden(item_id, hidden))
 
 
 @router.post("/items/{item_id}/privacy")
@@ -160,12 +195,5 @@ def change_privacy(request: Request, item_id: int, reviewed: bool = Form(...), v
 def delete(request: Request, item_id: int, view: str = Form("all")):
     if not is_admin(request):
         return _to_login()
-    removed = db.delete_item(item_id)
-    if removed is None:
-        return _back(view, f"{item_id}번은 이미 없어요.")
-    try:
-        storage.delete([removed["photo_path"], removed["thumb_path"]])
-    except Exception:
-        log.exception("%s번의 사진 파일을 지우지 못했어요(글은 지워졌어요).", item_id)
     log.info("관리자: %s번 지움", item_id)
-    return _back(view, f"{item_id}번을 지웠어요.")
+    return _back(view, remove_item(item_id))

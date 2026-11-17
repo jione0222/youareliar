@@ -12,7 +12,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from . import config, db, describe, embedding, limits, storage
+from . import categories, config, db, describe, embedding, limits, storage
 
 log = logging.getLogger("uvicorn.error")
 
@@ -115,7 +115,28 @@ def backfill_descriptions() -> None:
 REFILL_SECONDS = 30 * 60
 
 
+def backfill_categories() -> int:
+    """종류가 비어 있는 물건의 종류를 채운다. Claude가 고른 종류(group)가 있으면 그것을 쓰고,
+    없으면 Claude가 쓴 종류 이름·검색어나 메모에 든 낱말로 짐작한다. 채운 개수를 돌려준다."""
+    filled = 0
+    for row in db.items_missing_category():
+        info = row["ai_info"] or {}
+        group = categories.clean(info.get("group"))
+        if group is None:
+            clues = " ".join([info.get("category", ""), " ".join(info.get("search_keywords", [])), row["memo"] or ""])
+            group = categories.guess(clues)
+        if group is None and info:
+            group = "기타"  # Claude가 사진을 봤는데도 단서가 없으면 기타
+        if group:
+            db.set_category_if_empty(row["id"], group)
+            filled += 1
+    if filled:
+        log.info("물건 %d개의 종류를 채웠어요.", filled)
+    return filled
+
+
 def _fill_missing() -> None:
+    backfill_categories()
     backfill()
     # B: Claude를 쓰거나, 예전에 Claude가 써 둔 설명이 있을 때만 설명 검색 모델을 불러온다(메모리 절약).
     if describe.enabled() or db.count_described() > 0:

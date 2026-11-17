@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}내가 등록한 물건 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<h1>내가 등록한 물건</h1>
+<p class="lead">주인이 찾아가면 '주인 찾음'으로 바꾸고 찾아간 사람을 적어 두세요. 숨기거나 지울 수도 있어요.</p>
+
+{% if message %}<p class="alert success" role="status">{{ message }}</p>{% endif %}
+
+{% if items %}
+<ul class="admin-list">
+  {% set base = "/my/items" %}
+  {% set allow_privacy = false %}
+  {% set view = "" %}
+  {% for item in items %}
+    {% include "_manage_item.html" %}
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty">
+  <p>로그인한 채로 등록한 물건이 여기에 보여요. 아직 없어요.</p>
+  <a class="btn btn-primary" href="/register">물건 등록하기</a>
+</div>
+{% endif %}
+{% endblock %}

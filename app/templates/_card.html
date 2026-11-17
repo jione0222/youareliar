@@ -11,7 +11,7 @@
       {% if item.ai_info %}<p class="card-what">{{ item.ai_info.category }}</p>{% endif %}
       <p class="card-place">{{ item.storage_place }} 보관</p>
       <p class="card-meta">
-        {{ item.found_place or "발견 장소 모름" }}{% if item.found_date %} · {{ item.found_date|korean_date }}{% endif %}
+        {{ item.found_place or "발견 장소 모름" }}{% if item.found_date %} · {{ item.found_date|korean_date }}{% endif %}{% if item.view_count %} · 조회 {{ item.view_count }}{% endif %}
       </p>
       <p class="ai-reason" hidden></p>
       {% if debug and item.ranks %}

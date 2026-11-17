@@ -65,23 +65,25 @@ def fuse(rankings: dict[str, list[int]], weights: dict[str, float] = WEIGHTS) ->
     return ordered, ranks
 
 
-def search(query: str, limit: int = 20) -> list[dict]:
-    """검색 문장으로 물건을 찾아, 비슷한 순서대로 카드 정보를 돌려준다.
+def search(query: str, limit: int = 20, category: str | None = None) -> list[dict]:
+    """검색 문장으로 물건을 찾아, 비슷한 순서대로 카드 정보를 돌려준다. category가 있으면 그 종류 안에서만 찾는다.
     각 결과에는 방법별 등수(ranks)도 붙여 둔다. 예: {"image": 2, "description": 1}"""
     rankings: dict[str, list[int]] = {}
 
-    image_hits = db.search_by_vector(embedding.embed_text(query), config.EMBED_MODEL, "image", CANDIDATES)
+    image_hits = db.search_by_vector(
+        embedding.embed_text(query), config.EMBED_MODEL, "image", CANDIDATES, category
+    )
     rankings["image"] = [row["id"] for row in image_hits]
 
     if embedding.text_status() == "ready":
         description_hits = db.search_by_vector(
-            embedding.embed_description(query), config.TEXT_EMBED_MODEL, "description", CANDIDATES
+            embedding.embed_description(query), config.TEXT_EMBED_MODEL, "description", CANDIDATES, category
         )
         rankings["description"] = [row["id"] for row in description_hits]
 
     texts = {
         row["id"]: keyword_text(row["ai_info"], row["memo"], row["found_place"], row["storage_place"])
-        for row in db.keyword_rows()
+        for row in db.keyword_rows(category)
     }
     rankings["keyword"] = keyword_ranking(query, texts)
 

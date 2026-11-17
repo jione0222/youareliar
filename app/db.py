@@ -9,7 +9,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from . import config
+from . import categories, config
 
 # 연결 풀: DB 연결을 미리 몇 개 만들어 두고 돌려 쓴다(요청마다 새로 연결하면 느리다).
 pool = ConnectionPool(
@@ -72,34 +72,56 @@ def add_item(
     found_date: date | None,
     memo: str | None,
     user_id: int | None = None,
+    category: str | None = None,
+    finder_name: str | None = None,
+    finder_phone: str | None = None,
 ) -> int:
-    """습득물 하나를 저장하고, 새로 붙은 번호(id)를 돌려준다. user_id: 로그인한 등록자(없으면 None)."""
+    """습득물 하나를 저장하고, 새로 붙은 번호(id)를 돌려준다.
+    user_id: 로그인한 등록자, category: 등록한 사람이 고른 종류, finder_*: 습득자 연락처 (모두 없으면 None)"""
     with pool.connection() as conn:
         row = conn.execute(
             """
-            insert into items (photo_path, thumb_path, storage_place, found_place, found_date, memo, user_id)
-            values (%s, %s, %s, %s, %s, %s, %s)
+            insert into items (photo_path, thumb_path, storage_place, found_place, found_date, memo, user_id,
+                               category, finder_name, finder_phone)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             returning id
             """,
-            (photo_path, thumb_path, storage_place, found_place, found_date, memo, user_id),
+            (photo_path, thumb_path, storage_place, found_place, found_date, memo, user_id,
+             category, finder_name, finder_phone),
         ).fetchone()
     return row["id"]
 
 
-def list_items(limit: int = 60) -> list[dict]:
-    """최근에 등록된 습득물부터 보여 준다. 관리자가 숨긴 글은 뺀다."""
+# 목록 정렬 방법: 화면에서 받은 이름 → SQL의 order by (정해 둔 것만 쓴다. 사용자 입력을 SQL에 넣지 않는다)
+SORTS = {
+    "new": "created_at desc",
+    "old": "created_at asc",
+    "views": "view_count desc, created_at desc",
+}
+
+
+def list_items(sort: str = "new", category: str | None = None, limit: int = 60) -> list[dict]:
+    """습득물 목록. sort: new(최신순) / old(오래된순) / views(조회순), category: 이 종류만 (None이면 전부).
+    관리자가 숨긴 글은 뺀다."""
+    order = SORTS.get(sort, SORTS["new"])
     with pool.connection() as conn:
         return conn.execute(
-            """
+            f"""
             select id, created_at, thumb_path, storage_place, found_place, found_date, status,
-                   ai_info, privacy_reviewed
+                   ai_info, privacy_reviewed, category, view_count
             from items
-            where not hidden
-            order by created_at desc
+            where not hidden and (%s::text is null or category = %s)
+            order by {order}
             limit %s
             """,
-            (limit,),
+            (category, category, limit),
         ).fetchall()
+
+
+def add_view(item_id: int) -> None:
+    """상세 화면을 한 번 열 때마다 조회 수를 1 올린다(조회순 정렬에 쓴다)."""
+    with pool.connection() as conn:
+        conn.execute("update items set view_count = view_count + 1 where id = %s", (item_id,))
 
 
 def get_item(item_id: int) -> dict | None:
@@ -147,7 +169,7 @@ def items_missing_vector(model: str, kind: str) -> list[dict]:
         ).fetchall()
 
 
-def search_by_vector(vector, model: str, kind: str, limit: int = 20) -> list[dict]:
+def search_by_vector(vector, model: str, kind: str, limit: int = 20, category: str | None = None) -> list[dict]:
     """검색 문장의 벡터와 가장 가까운 물건부터 돌려준다.
 
     <=> 는 pgvector의 '코사인 거리' 계산 기호다. 거리가 작을수록 비슷하다.
@@ -163,10 +185,11 @@ def search_by_vector(vector, model: str, kind: str, limit: int = 20) -> list[dic
             join items i on i.id = v.item_id
             cross join (select %s::vector as vec) q
             where v.model = %s and v.kind = %s and not i.hidden
+              and (%s::text is null or i.category = %s)
             order by v.embedding <=> q.vec
             limit %s
             """,
-            (to_pg_vector(vector), model, kind, limit),
+            (to_pg_vector(vector), model, kind, category, category, limit),
         ).fetchall()
 
 
@@ -179,10 +202,11 @@ def save_description(item_id: int, info: dict, model: str) -> None:
         conn.execute(
             """
             update items
-            set ai_description = %s, ai_info = %s, ai_model = %s, ai_described_at = now()
+            set ai_description = %s, ai_info = %s, ai_model = %s, ai_described_at = now(),
+                category = coalesce(category, %s)  -- 등록한 사람이 고른 종류가 있으면 그대로 둔다
             where id = %s
             """,
-            (info["description"], Jsonb(info), model, item_id),
+            (info["description"], Jsonb(info), model, categories.clean(info.get("group")), item_id),
         )
 
 
@@ -213,14 +237,19 @@ ADMIN_VIEWS = {
 }
 
 
+# 관리 화면(관리자 화면과 '내가 등록한 물건')에서 보여 줄 칸
+MANAGE_COLUMNS = """id, created_at, thumb_path, storage_place, found_place, found_date, memo,
+                   status, hidden, ai_info, privacy_reviewed, category, view_count,
+                   finder_name, finder_phone, claimant_name, claimant_student_id, returned_at, user_id"""
+
+
 def admin_list_items(view: str, limit: int = 200) -> list[dict]:
     """관리자용 목록. 숨긴 글까지 모두 보여 준다."""
     condition = ADMIN_VIEWS[view]  # 정해 둔 조건만 쓴다(사용자 입력을 SQL에 직접 넣지 않는다)
     with pool.connection() as conn:
         return conn.execute(
             f"""
-            select id, created_at, thumb_path, storage_place, found_place, found_date, memo,
-                   status, hidden, ai_info, privacy_reviewed
+            select {MANAGE_COLUMNS}
             from items
             where {condition}
             order by created_at desc
@@ -230,9 +259,50 @@ def admin_list_items(view: str, limit: int = 200) -> list[dict]:
         ).fetchall()
 
 
-def set_status(item_id: int, status: str) -> None:
+def set_status(item_id: int, status: str, claimant_name: str | None = None,
+               claimant_student_id: str | None = None) -> None:
+    """'주인 찾음'(returned)으로 바꾸면 찾아간 사람(이름·학번)과 시각을 함께 적고,
+    '보관 중'(stored)으로 되돌리면 그 기록을 지운다."""
     with pool.connection() as conn:
-        conn.execute("update items set status = %s where id = %s", (status, item_id))
+        if status == "returned":
+            conn.execute(
+                """
+                update items set status = 'returned', claimant_name = %s, claimant_student_id = %s,
+                                 returned_at = now()
+                where id = %s
+                """,
+                (claimant_name, claimant_student_id, item_id),
+            )
+        else:
+            conn.execute(
+                """
+                update items set status = %s, claimant_name = null, claimant_student_id = null,
+                                 returned_at = null
+                where id = %s
+                """,
+                (status, item_id),
+            )
+
+
+def my_items(user_id: int) -> list[dict]:
+    """로그인한 사람이 등록한 물건들 (숨긴 글까지)."""
+    with pool.connection() as conn:
+        return conn.execute(
+            f"""
+            select {MANAGE_COLUMNS}
+            from items
+            where user_id = %s
+            order by created_at desc
+            """,
+            (user_id,),
+        ).fetchall()
+
+
+def item_owner(item_id: int) -> int | None:
+    """물건을 등록한 회원 번호 (로그인하지 않고 등록했거나 물건이 없으면 None)."""
+    with pool.connection() as conn:
+        row = conn.execute("select user_id from items where id = %s", (item_id,)).fetchone()
+    return row["user_id"] if row else None
 
 
 def set_hidden(item_id: int, hidden: bool) -> None:
@@ -294,12 +364,27 @@ def count_described() -> int:
         return conn.execute("select count(*) as n from items where ai_info is not null").fetchone()["n"]
 
 
-def keyword_rows() -> list[dict]:
-    """키워드 검색에 쓸 글 재료 (공개된 물건만)."""
+def keyword_rows(category: str | None = None) -> list[dict]:
+    """키워드 검색에 쓸 글 재료 (공개된 물건만, category가 있으면 그 종류만)."""
     with pool.connection() as conn:
         return conn.execute(
-            "select id, ai_info, memo, found_place, storage_place from items where not hidden"
+            """
+            select id, ai_info, memo, found_place, storage_place from items
+            where not hidden and (%s::text is null or category = %s)
+            """,
+            (category, category),
         ).fetchall()
+
+
+def items_missing_category() -> list[dict]:
+    """종류가 아직 비어 있는 물건들 (짐작해서 채우려고)."""
+    with pool.connection() as conn:
+        return conn.execute("select id, ai_info, memo from items where category is null").fetchall()
+
+
+def set_category_if_empty(item_id: int, category: str) -> None:
+    with pool.connection() as conn:
+        conn.execute("update items set category = %s where id = %s and category is null", (category, item_id))
 
 
 def items_by_ids(ids: list[int]) -> dict[int, dict]:
@@ -310,7 +395,7 @@ def items_by_ids(ids: list[int]) -> dict[int, dict]:
         rows = conn.execute(
             """
             select id, created_at, thumb_path, storage_place, found_place, found_date, status,
-                   ai_info, privacy_reviewed
+                   ai_info, privacy_reviewed, category, view_count
             from items
             where id = any(%s) and not hidden
             """,

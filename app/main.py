@@ -3,18 +3,20 @@
 실행:  uvicorn app.main:app --reload
 """
 import logging
+import re
 import threading
 import uuid
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
-from . import accounts, admin, auth, db, embedding, images, indexing, rerank, search, storage
+from . import accounts, admin, auth, categories, db, embedding, images, indexing, migrate, mine, rerank, search, storage
 from .templating import templates, today
 
 APP_DIR = Path(__file__).resolve().parent
@@ -25,19 +27,28 @@ MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15MB보다 큰 파일은 받지 않는다
 STORAGE_PLACE_SUGGESTIONS = ["교무실", "행정실", "체육관 사무실", "도서관", "보건실"]
 
 
-def _check_db() -> None:
-    """서버가 켜질 때 DB에 연결되는지 확인하고, 안 되면 고치는 방법을 서버 기록에 남긴다."""
+def _prepare_db() -> None:
+    """서버가 켜질 때: DB에 연결되는지 확인하고, 아직 적용하지 않은 DB 구조 변경(마이그레이션)을 적용한다.
+    그래서 Cloud Run에 새 코드를 올리면 노트북에서 python -m app.migrate를 따로 하지 않아도 된다.
+    안 되면 고치는 방법을 서버 기록에 남기고, 서버는 그대로 켠다."""
     error = db.check_connection()
-    if error is None:
-        log.info("DB에 연결했어요.")
+    if error is not None:
+        log.error("[DB 연결 실패] %s\n  오류 내용: %s", db.connection_hint(error), error.splitlines()[0])
         return
-    log.error("[DB 연결 실패] %s\n  오류 내용: %s", db.connection_hint(error), error.splitlines()[0])
+    log.info("DB에 연결했어요.")
+    try:
+        applied = migrate.apply_sql_migrations(say=lambda message: None)
+    except (Exception, SystemExit):
+        log.exception("DB 구조를 바꾸다가(마이그레이션) 오류가 났어요.")
+        return
+    if applied:
+        log.info("DB 구조를 바꿨어요: %s", ", ".join(applied))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.pool.open()  # 서버가 켜질 때 DB 연결을 준비하고
-    threading.Thread(target=_check_db, daemon=True).start()  # 정말 연결되는지 확인한다
+    _prepare_db()  # 정말 연결되는지 확인하고, 바뀐 DB 구조가 있으면 적용한다(보통 1초 안쪽)
     # AI 모델은 불러오는 데 시간이 걸려서, 서버를 먼저 띄우고 뒤에서(별도 스레드) 준비한다.
     threading.Thread(target=indexing.warm_up, daemon=True).start()
     yield
@@ -53,20 +64,64 @@ if not storage.using_supabase():
 
 app.include_router(admin.router)  # 관리자 화면 (/admin)
 app.include_router(accounts.router)  # 회원가입·로그인 (/signup, /login, /logout)
+app.include_router(mine.router)  # 내가 등록한 물건 관리 (/my)
 
 # ---------- 화면 ----------
 
 
+SORT_LABELS = {"new": "최신순", "old": "오래된순", "views": "조회순"}
+
+
+def _url(path: str, **params) -> str:
+    """주소 만들기: 값이 있는 것만 ?a=1&b=2 처럼 붙인다."""
+    query = urlencode({key: value for key, value in params.items() if value})
+    return f"{path}?{query}" if query else path
+
+
+def category_links(path: str, current: str | None, **keep) -> list[dict]:
+    """종류 필터 버튼들: [{label, url, active}, ...]. keep: 함께 유지할 값(검색어, 정렬)"""
+    links = [{"label": "전체", "url": _url(path, **keep), "active": current is None}]
+    for group in categories.GROUPS:
+        links.append({"label": group, "url": _url(path, **keep, cat=group), "active": current == group})
+    return links
+
+
 @app.get("/")
-def item_list(request: Request):
-    """첫 화면: 최근 등록된 습득물 목록."""
-    return templates.TemplateResponse(request, "list.html", {"items": db.list_items()})
+def item_list(request: Request, sort: str = "new", cat: str = ""):
+    """첫 화면: 습득물 목록. ?sort=new|old|views 로 정렬하고, ?cat=의류 처럼 종류를 고를 수 있다."""
+    sort = sort if sort in SORT_LABELS else "new"
+    category = categories.clean(cat)
+    context = {
+        "items": db.list_items(sort, category),
+        "sort": sort,
+        "category": category,
+        "category_links": category_links("/", category, sort=None if sort == "new" else sort),
+        "sort_links": [
+            {"label": label, "url": _url("/", sort=None if key == "new" else key, cat=category), "active": key == sort}
+            for key, label in SORT_LABELS.items()
+        ],
+    }
+    return templates.TemplateResponse(request, "list.html", context)
 
 
 @app.get("/register")
 def register_form(request: Request):
     """습득물 등록 화면."""
-    return render_register(request, values={"found_date": today().isoformat()})
+    values = {"found_date": today().isoformat()}
+    user = auth.current_user(request)
+    if user:
+        values["finder_name"] = user["nickname"]  # 로그인했으면 이름 칸을 미리 채워 둔다(지워도 된다)
+    return render_register(request, values=values)
+
+
+def normalize_phone(text: str) -> str:
+    """전화번호를 010-1234-5678 모양으로 맞춘다. 이상한 번호면 ValueError."""
+    digits = re.sub(r"\D", "", text)
+    if not digits.startswith("0") or not 9 <= len(digits) <= 11:
+        raise ValueError(text)
+    if digits.startswith("02"):  # 서울 지역번호는 두 자리
+        return f"{digits[:2]}-{digits[2:-4]}-{digits[-4:]}"
+    return f"{digits[:3]}-{digits[3:-4]}-{digits[-4:]}"
 
 
 @app.post("/register")
@@ -79,6 +134,10 @@ def register(
     found_place: str = Form(""),
     found_date: str = Form(""),
     memo: str = Form(""),
+    category: str = Form(""),
+    finder_name: str = Form(""),
+    finder_phone: str = Form(""),
+    contact_consent: str = Form(""),
 ):
     """등록 화면에서 [등록하기]를 누르면 여기로 온다."""
     values = {
@@ -86,6 +145,10 @@ def register(
         "found_place": found_place,
         "found_date": found_date,
         "memo": memo,
+        "category": category,
+        "finder_name": finder_name,
+        "finder_phone": finder_phone,
+        "contact_consent": contact_consent,
     }
 
     def fail(message: str):
@@ -110,6 +173,19 @@ def register(
             return fail("발견 날짜를 다시 골라 주세요.")
         if parsed_date > today():
             return fail("발견 날짜가 오늘보다 뒤일 수는 없어요.")
+
+    # 습득자 연락처(선택): 적었다면 공개 동의가 있어야 하고, 전화번호는 모양을 맞춘다.
+    finder_name = finder_name.strip()
+    finder_phone = finder_phone.strip()
+    if len(finder_name) > 20:
+        return fail("이름은 20자 이내로 적어 주세요.")
+    if finder_phone:
+        try:
+            finder_phone = normalize_phone(finder_phone)
+        except ValueError:
+            return fail("전화번호를 다시 확인해 주세요. 예: 010-1234-5678")
+    if (finder_name or finder_phone) and contact_consent != "yes":
+        return fail("연락처를 남기려면 '로그인한 사람에게 보여 주는 데 동의해요'에 체크해 주세요.")
 
     photo = next((f for f in (photo_camera, photo_album) if f is not None and f.filename), None)
     if photo is None:
@@ -141,6 +217,9 @@ def register(
         parsed_date,
         memo or None,
         user_id=user["id"] if user else None,
+        category=categories.clean(category),  # 고르지 않았으면 None → Claude가 정한다
+        finder_name=finder_name or None,
+        finder_phone=finder_phone or None,
     )
 
     # 5) AI 검색을 위해 사진을 벡터로 바꿔 저장한다.
@@ -153,14 +232,17 @@ def register(
 
 
 @app.get("/search")
-def search_page(request: Request, q: str = "", debug: bool = False):
+def search_page(request: Request, q: str = "", debug: bool = False, cat: str = ""):
     """AI 검색: 사진 벡터·설명 벡터·키워드로 찾은 순위를 합쳐서 비슷한 물건부터 보여 준다.
     주소 끝에 &debug=1 을 붙이면 카드마다 방법별 등수가 보인다(발표·시험용)."""
     query = q.strip()[:100]
     if not query:
         return RedirectResponse("/", status_code=303)
+    category = categories.clean(cat)
     context = {
         "q": query,
+        "category": category,
+        "category_links": category_links("/search", category, q=query, debug="1" if debug else None),
         "items": [],
         "ai_status": embedding.status(),
         "uses_descriptions": embedding.text_status() == "ready",
@@ -168,7 +250,7 @@ def search_page(request: Request, q: str = "", debug: bool = False):
         "debug": debug,
     }
     if embedding.status() == "ready":
-        context["items"] = search.search(query)
+        context["items"] = search.search(query, category=category)
     return templates.TemplateResponse(request, "search.html", context)
 
 
@@ -198,9 +280,13 @@ def search_rerank(q: str = "", ids: str = ""):
 def item_detail(request: Request, item_id: int, new: bool = False):
     """습득물 하나의 상세 화면."""
     item = db.get_item(item_id)
-    if item is None or item["hidden"]:
+    user = auth.current_user(request)
+    is_owner = bool(item and user and item["user_id"] == user["id"])  # 내가 등록한 물건인지
+    if item is None or (item["hidden"] and not is_owner):  # 숨긴 글은 등록한 사람만 볼 수 있다
         raise HTTPException(status_code=404, detail="찾는 물건이 없어요. 이미 지워졌을 수 있어요.")
-    return templates.TemplateResponse(request, "item.html", {"item": item, "new": new})
+    if not new and not is_owner:  # 방금 등록하고 넘어온 것과 내 물건을 내가 본 것은 세지 않는다
+        db.add_view(item_id)
+    return templates.TemplateResponse(request, "item.html", {"item": item, "new": new, "is_owner": is_owner})
 
 
 # ---------- 도우미 ----------
@@ -215,6 +301,7 @@ def render_register(request: Request, values: dict, error: str | None = None, st
             "error": error,
             "suggestions": STORAGE_PLACE_SUGGESTIONS,
             "today": today().isoformat(),
+            "groups": categories.GROUPS,
         },
         status_code=status_code,
     )

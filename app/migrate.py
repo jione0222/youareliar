@@ -15,15 +15,21 @@ from storage3.exceptions import StorageApiError
 from . import config, db, storage
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "db" / "migrations"
+# 서버가 여러 대 동시에 켜져도 한 대씩만 적용하게 거는 '자물쇠' 번호(아무 숫자나 정해 두면 된다)
+MIGRATION_LOCK = 20261117
 
 
-def apply_sql_migrations() -> None:
+def apply_sql_migrations(say=print) -> list[str]:
+    """아직 적용하지 않은 SQL 파일을 순서대로 적용하고, 적용한 파일 이름을 돌려준다.
+    서버가 켜질 때(main.py)도 이 함수를 불러서, 새 코드를 올리면 DB 구조도 알아서 바뀐다."""
     try:
         conn = psycopg.connect(config.DATABASE_URL, prepare_threshold=None, connect_timeout=10)
     except psycopg.OperationalError as error:
         message = str(error).strip()
         raise SystemExit(f"\n[DB 연결 실패] {db.connection_hint(message)}\n  오류 내용: {message.splitlines()[0]}\n")
+    applied = []
     with conn:
+        conn.execute("select pg_advisory_lock(%s)", (MIGRATION_LOCK,))  # 연결이 끝나면 저절로 풀린다
         conn.execute(
             """
             create table if not exists schema_migrations (
@@ -38,13 +44,15 @@ def apply_sql_migrations() -> None:
         done = {row[0] for row in conn.execute("select name from schema_migrations")}
         for file in sorted(MIGRATIONS_DIR.glob("*.sql")):
             if file.name in done:
-                print(f"  건너뜀(이미 적용됨): {file.name}")
+                say(f"  건너뜀(이미 적용됨): {file.name}")
                 continue
             # 파일 하나를 통째로 한 번에 적용한다. 중간에 오류가 나면 그 파일 전체가 취소된다.
             conn.execute(file.read_text(encoding="utf-8"))
             conn.execute("insert into schema_migrations (name) values (%s)", (file.name,))
             conn.commit()
-            print(f"  적용함: {file.name}")
+            say(f"  적용함: {file.name}")
+            applied.append(file.name)
+    return applied
 
 
 def ensure_bucket() -> None:

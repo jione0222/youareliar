@@ -4,16 +4,31 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}학교 분실물 찾기{% endblock %}</title>
+  <script>
+    // 고른 화면 색을 화면을 그리기 전에 먼저 적용한다(깜빡임 방지). 저장할 수 없는 브라우저면 기본 색.
+    try {
+      const accent = localStorage.getItem("theme-accent");
+      const mode = localStorage.getItem("theme-mode");
+      if (accent) document.documentElement.dataset.accent = accent;
+      if (mode) document.documentElement.dataset.mode = mode;
+    } catch (error) {}
+  </script>
   <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
 </head>
 <body>
   <header class="top">
-    <a class="logo" href="/">학교 분실물 찾기</a>
+    <div class="top-left">
+      {% if request.url.path != "/" %}
+      <button class="back-button" type="button" onclick="goBack()" aria-label="뒤로 가기" title="뒤로 가기">←</button>
+      {% endif %}
+      <a class="logo" href="/">학교 분실물 찾기</a>
+    </div>
     <div class="top-actions">
       {% set user = current_user(request) %}
       {% if user %}
       <form class="user-menu" method="post" action="/logout">
-        <span class="user-name">{{ user.nickname }}님</span>
+        <a class="user-name" href="/my" title="내가 등록한 물건">{{ user.nickname }}님</a>
         <button class="link-button" type="submit">로그아웃</button>
       </form>
       {% else %}
@@ -28,7 +43,56 @@
     {% block content %}{% endblock %}
   </main>
   <footer class="foot">
+    <div class="theme-picker" role="group" aria-label="화면 색 고르기">
+      <span class="theme-label">화면 색</span>
+      {% for key, label in [("blue", "파랑"), ("green", "초록"), ("purple", "보라"), ("orange", "주황"), ("pink", "분홍"), ("teal", "청록")] %}
+      <button class="swatch swatch-{{ key }}" type="button" data-accent="{{ key }}" aria-label="{{ label }}" title="{{ label }}"></button>
+      {% endfor %}
+      <span class="theme-modes">
+        <button type="button" data-mode="auto">자동</button>
+        <button type="button" data-mode="light">밝게</button>
+        <button type="button" data-mode="dark">어둡게</button>
+      </span>
+    </div>
     <a href="/admin">관리자</a>
   </footer>
+  <script>
+    // 뒤로 가기: 이 사이트 안에서 넘어왔으면 바로 전 화면으로, 주소로 바로 들어왔으면 첫 화면으로 간다.
+    function goBack() {
+      if (document.referrer.startsWith(location.origin) && history.length > 1) history.back();
+      else location.href = "/";
+    }
+
+    // 화면 색 고르기: 고른 색은 이 기기(브라우저)에만 저장된다.
+    (() => {
+      const root = document.documentElement;
+      const picker = document.querySelector(".theme-picker");
+      const showChosen = () => {
+        const accent = root.dataset.accent || "blue";
+        const mode = root.dataset.mode || "auto";
+        picker.querySelectorAll("[data-accent]").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.accent === accent));
+        });
+        picker.querySelectorAll("[data-mode]").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+        });
+      };
+      picker.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+        const key = button.dataset.accent ? "accent" : "mode";
+        const value = button.dataset[key];
+        const isDefault = value === "blue" || value === "auto";
+        if (isDefault) delete root.dataset[key];
+        else root.dataset[key] = value;
+        try {
+          if (isDefault) localStorage.removeItem(`theme-${key}`);
+          else localStorage.setItem(`theme-${key}`, value);
+        } catch (error) {}
+        showChosen();
+      });
+      showChosen();
+    })();
+  </script>
 </body>
 </html>

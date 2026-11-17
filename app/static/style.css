@@ -2,15 +2,23 @@
 
 :root {
   color-scheme: light dark;
+  /* 강조색(테마): 색상(h)·채도(s)와 밝기들. 아래 [data-accent=...]가 이 숫자만 바꾼다.
+     밝기는 글자가 잘 읽히도록(명암비 4.5 이상) 색마다 계산해서 정했다. */
+  --h: 222;
+  --s: 71%;
+  --l: 49%;    /* 밝은 화면의 강조색 밝기 */
+  --dl: 65%;   /* 어두운 화면의 강조색 밝기 */
+  --tl: 40%;   /* 밝은 화면의 연한 배지 글자 밝기 */
+  --dtl: 83%;  /* 어두운 화면의 연한 배지 글자 밝기 */
   --bg: #f5f6f8;
   --surface: #ffffff;
   --text: #1b2330;
   --muted: #5d6877;
   --line: #e1e5ea;
-  --primary: #2459d6;
+  --primary: hsl(var(--h) var(--s) var(--l));
   --on-primary: #ffffff;
-  --stored-bg: #e6eefc;
-  --stored-text: #1d47b0;
+  --stored-bg: hsl(var(--h) 85% 94%);
+  --stored-text: hsl(var(--h) 70% var(--tl));
   --returned-bg: #eceef1;
   --returned-text: #4a5361;
   --success-bg: #e5f5ea;
@@ -20,18 +28,18 @@
   --radius: 14px;
 }
 
-/* 휴대폰이 어두운 모드일 때의 색 */
+/* 어두운 화면의 색: 휴대폰이 어두운 모드일 때(직접 '밝게'를 고르지 않았다면), 또는 '어둡게'를 골랐을 때 */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-mode="light"]) {
     --bg: #111519;
     --surface: #1a2027;
     --text: #e7ecf2;
     --muted: #9ba6b3;
     --line: #2a323c;
-    --primary: #5b8cf0;
+    --primary: hsl(var(--h) 82% var(--dl));
     --on-primary: #0b1220;
-    --stored-bg: #1c2943;
-    --stored-text: #a8c2ff;
+    --stored-bg: hsl(var(--h) 40% 19%);
+    --stored-text: hsl(var(--h) 100% var(--dtl));
     --returned-bg: #252a31;
     --returned-text: #b4bcc6;
     --success-bg: #163322;
@@ -40,6 +48,36 @@
     --error-text: #f1a3a3;
   }
 }
+
+:root[data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #111519;
+  --surface: #1a2027;
+  --text: #e7ecf2;
+  --muted: #9ba6b3;
+  --line: #2a323c;
+  --primary: hsl(var(--h) 82% var(--dl));
+  --on-primary: #0b1220;
+  --stored-bg: hsl(var(--h) 40% 19%);
+  --stored-text: hsl(var(--h) 100% var(--dtl));
+  --returned-bg: #252a31;
+  --returned-text: #b4bcc6;
+  --success-bg: #163322;
+  --success-text: #8edcab;
+  --error-bg: #381b1b;
+  --error-text: #f1a3a3;
+}
+
+:root[data-mode="light"] {
+  color-scheme: light;
+}
+
+/* 화면 색 고르기: 강조색마다 숫자만 바꾼다 (기본은 파랑) */
+:root[data-accent="green"]  { --h: 150; --s: 62%; --l: 30%; --dl: 45%; --tl: 26%; --dtl: 78%; }
+:root[data-accent="purple"] { --h: 265; --s: 60%; --l: 52%; --dl: 72%; --tl: 42%; --dtl: 85%; }
+:root[data-accent="orange"] { --h: 22;  --s: 80%; --l: 38%; --dl: 55%; --tl: 32%; --dtl: 78%; }
+:root[data-accent="pink"]   { --h: 330; --s: 65%; --l: 45%; --dl: 66%; --tl: 38%; --dtl: 82%; }
+:root[data-accent="teal"]   { --h: 185; --s: 70%; --l: 28%; --dl: 48%; --tl: 26%; --dtl: 78%; }
 
 * {
   box-sizing: border-box;
@@ -747,4 +785,295 @@ h1 {
 .match-low {
   background: var(--returned-bg);
   color: var(--returned-text);
+}
+
+/* ---------- 정렬과 종류 필터 ---------- */
+.list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.list-head .section-title {
+  margin-bottom: 8px;
+}
+
+.sort-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.sort-tabs a {
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sort-tabs a.active {
+  background: var(--stored-bg);
+  color: var(--stored-text);
+}
+
+/* 휴대폰에서는 버튼들을 옆으로 밀어서 본다 */
+.filters {
+  display: flex;
+  gap: 6px;
+  margin: 0 -16px 16px;
+  padding: 2px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
+}
+
+.filter {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.filter.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ---------- 등록: 사진 자르기, 종류, 내 연락처 ---------- */
+.crop-area {
+  width: 100%;
+  height: min(60vh, 420px);
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.crop-area img {
+  display: block;
+  max-width: 100%;
+}
+
+.crop-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.field select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.contact-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.contact-fields legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.contact-fields .hint {
+  margin: 0;
+}
+
+.opt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.92rem;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+
+/* ---------- 상세: 습득자 연락처 ---------- */
+.contact-box {
+  margin: 0 0 16px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--stored-bg);
+  color: var(--stored-text);
+}
+
+.contact-box h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.contact-box p {
+  margin: 0;
+}
+
+.contact-box a {
+  color: inherit;
+  font-weight: 800;
+}
+
+.contact-box .hint {
+  margin-top: 6px;
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* ---------- 위쪽 막대: 뒤로 가기 ---------- */
+.top-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.back-button:hover {
+  background: var(--bg);
+}
+
+/* ---------- 아래쪽: 화면 색 고르기 ---------- */
+.theme-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.theme-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+
+.swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--text);
+}
+
+.swatch-blue { background: #2459d6; }
+.swatch-green { background: #1d7c4c; }
+.swatch-purple { background: #7e44cf; }
+.swatch-orange { background: #af4c13; }
+.swatch-pink { background: #be2875; }
+.swatch-teal { background: #167079; }
+
+.theme-modes {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.theme-modes button {
+  padding: 4px 10px;
+  border: 0;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.theme-modes button[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ---------- 관리: 주인 찾음(찾아간 사람 기록) ---------- */
+.return-box summary {
+  list-style: none;
+}
+
+.return-box summary::-webkit-details-marker {
+  display: none;
+}
+
+.return-box[open] {
+  flex-basis: 100%;
+}
+
+.return-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.claimant {
+  font-weight: 700;
+}
+
+.owner-note a,
+.alert.info a {
+  color: inherit;
+  font-weight: 800;
+}
+
+a.user-name {
+  text-decoration: none;
 }

@@ -2,9 +2,18 @@
 
 {% block title %}주운 물건 등록 · 학교 분실물 찾기{% endblock %}
 
+{% block head %}
+{# 사진 자르기 도구 Cropper.js (MIT 라이선스, static/vendor에 넣어 둠) #}
+<link rel="stylesheet" href="/static/vendor/cropperjs-1.6.2/cropper.min.css">
+<script src="/static/vendor/cropperjs-1.6.2/cropper.min.js" defer></script>
+{% endblock %}
+
 {% block content %}
 <h1>주운 물건 등록</h1>
 <p class="lead">사진 한 장과 보관 장소만 있으면 돼요.</p>
+{% if not current_user(request) %}
+<p class="alert info"><a href="/login?next=/register">로그인</a>하고 등록하면 나중에 '주인 찾음' 표시나 지우기를 직접 할 수 있어요.</p>
+{% endif %}
 
 {% if error %}
 <p class="alert error" role="alert">{{ error }}</p>
@@ -13,7 +22,15 @@
 <form id="register-form" class="form" method="post" action="/register" enctype="multipart/form-data">
   <fieldset class="photo-picker">
     <legend>사진 <span class="req">필수</span></legend>
-    <img id="preview" class="preview" alt="고른 사진 미리 보기" hidden>
+    <div id="crop-area" class="crop-area" hidden>
+      <img id="crop-image" alt="고른 사진">
+    </div>
+    <div id="crop-tools" class="crop-tools" hidden>
+      <button type="button" class="btn btn-small" data-action="rotate-left">↺ 왼쪽으로 돌리기</button>
+      <button type="button" class="btn btn-small" data-action="rotate-right">↻ 오른쪽으로 돌리기</button>
+      <button type="button" class="btn btn-small" data-action="reset">처음처럼</button>
+    </div>
+    <p id="crop-hint" class="hint" hidden>네모 칸의 모서리를 끌어서 물건만 남기세요. 그대로 두면 사진 전체가 올라가요.</p>
     <div class="photo-buttons">
       <label class="btn btn-primary">
         카메라로 찍기
@@ -37,6 +54,16 @@
   </datalist>
 
   <label class="field">
+    <span>물건 종류</span>
+    <select name="category">
+      <option value="">{{ "AI가 사진을 보고 고르기" if ai_enabled() else "고르지 않기" }}</option>
+      {% for group in groups %}
+      <option value="{{ group }}"{% if values.category == group %} selected{% endif %}>{{ group }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="field">
     <span>발견 장소</span>
     <input name="found_place" maxlength="50" placeholder="예: 3층 복도, 체육관"
            value="{{ values.found_place or '' }}">
@@ -53,15 +80,60 @@
               placeholder="예: 뚜껑에 고양이 스티커가 붙어 있음">{{ values.memo or '' }}</textarea>
   </label>
 
+  <fieldset class="contact-fields">
+    <legend>내 연락처 <span class="opt">선택</span></legend>
+    <p class="hint">남기면 <strong>로그인한 사람에게만</strong> 보여요. 주인이 직접 연락할 수 있어요.</p>
+    <label class="field">
+      <span>이름</span>
+      <input name="finder_name" maxlength="20" autocomplete="name" placeholder="예: 홍길동"
+             value="{{ values.finder_name or '' }}">
+    </label>
+    <label class="field">
+      <span>전화번호</span>
+      <input name="finder_phone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel"
+             placeholder="예: 010-1234-5678" value="{{ values.finder_phone or '' }}">
+    </label>
+    <label class="check">
+      <input type="checkbox" name="contact_consent" value="yes"{% if values.contact_consent == "yes" %} checked{% endif %}>
+      <span>로그인한 사람에게 이름과 전화번호를 보여 주는 데 동의해요</span>
+    </label>
+  </fieldset>
+
   <button id="submit-button" class="btn btn-primary btn-block" type="submit">등록하기</button>
 </form>
 
 <script>
-  // 사진을 고르면 미리 보여 주고, 두 버튼 중 마지막에 고른 사진 하나만 보낸다.
+  // 사진을 고르면 자르기 화면을 보여 준다. 두 버튼 중 마지막에 고른 사진 하나만 보낸다.
+  // 등록할 때 잘라 낸 부분만 JPEG로 만들어서 원래 사진 대신 보낸다.
   const form = document.getElementById("register-form");
   const fileInputs = form.querySelectorAll('input[type="file"]');
-  const preview = document.getElementById("preview");
+  const cropArea = document.getElementById("crop-area");
+  const cropImage = document.getElementById("crop-image");
+  const cropTools = document.getElementById("crop-tools");
+  const cropHint = document.getElementById("crop-hint");
   const submitButton = document.getElementById("submit-button");
+  let cropper = null;
+  let chosenInput = null;
+  let photoUrl = null;
+
+  function showPhoto(file) {
+    if (cropper) { cropper.destroy(); cropper = null; }
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    photoUrl = URL.createObjectURL(file);
+    cropImage.src = photoUrl;
+    cropArea.hidden = false;
+    if (!window.Cropper) return; // 자르기 도구를 못 불러왔으면 미리 보기만 하고 사진 전체를 보낸다
+    cropTools.hidden = false;
+    cropHint.hidden = false;
+    cropper = new Cropper(cropImage, {
+      viewMode: 1,          // 자르는 칸이 사진 밖으로 나가지 않게
+      autoCropArea: 1,      // 처음에는 사진 전체를 고른 상태
+      background: false,
+      movable: false,       // 사진은 고정하고, 네모 칸만 움직인다
+      zoomable: false,      // 휴대폰에서 실수로 확대되지 않게
+      toggleDragModeOnDblclick: false,
+    });
+  }
 
   fileInputs.forEach((input) => {
     input.addEventListener("change", () => {
@@ -70,27 +142,64 @@
       fileInputs.forEach((other) => {
         if (other !== input) other.value = "";
       });
-      preview.src = URL.createObjectURL(file);
-      preview.hidden = false;
+      chosenInput = input;
+      delete form.dataset.ready;
+      showPhoto(file);
     });
   });
 
+  cropTools.addEventListener("click", (event) => {
+    const action = event.target.dataset.action;
+    if (!cropper || !action) return;
+    if (action === "rotate-left") cropper.rotate(-90);
+    if (action === "rotate-right") cropper.rotate(90);
+    if (action === "reset") cropper.reset();
+  });
+
+  function lockButton(text) {
+    // 두 번 눌러서 같은 물건이 두 번 등록되지 않게 막는다.
+    submitButton.disabled = true;
+    submitButton.textContent = text;
+  }
+
   form.addEventListener("submit", (event) => {
-    const hasPhoto = [...fileInputs].some((input) => input.files.length > 0);
-    if (!hasPhoto) {
+    if (!chosenInput) {
       event.preventDefault();
       alert("사진을 찍거나 골라 주세요.");
       return;
     }
-    // 두 번 눌러서 같은 물건이 두 번 등록되지 않게 막는다.
-    submitButton.disabled = true;
-    submitButton.textContent = "올리는 중…";
+    if (form.dataset.ready || !cropper || !window.DataTransfer) {
+      lockButton("올리는 중…");
+      return; // 자를 수 없으면 원래 사진을 그대로 보낸다
+    }
+    event.preventDefault();
+    lockButton("사진 준비 중…");
+    const canvas = cropper.getCroppedCanvas({ maxWidth: 2048, maxHeight: 2048, fillColor: "#fff" });
+    const send = () => {
+      form.dataset.ready = "yes";
+      submitButton.textContent = "올리는 중…";
+      form.submit();
+    };
+    if (!canvas) return send();
+    canvas.toBlob((blob) => {
+      try {
+        if (blob) {
+          const files = new DataTransfer();
+          files.items.add(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+          chosenInput.files = files.files; // 잘라 낸 사진으로 바꿔 끼운다
+        }
+      } catch (error) {
+        // 바꿔 끼울 수 없는 브라우저면 원래 사진을 보낸다
+      }
+      send();
+    }, "image/jpeg", 0.9);
   });
 
   // 뒤로 가기로 돌아왔을 때 버튼이 계속 막혀 있지 않게 되돌린다.
   window.addEventListener("pageshow", () => {
     submitButton.disabled = false;
     submitButton.textContent = "등록하기";
+    delete form.dataset.ready;
   });
 </script>
 {% endblock %}

@@ -6,10 +6,11 @@
 <section class="intro">
   {% include "_search_form.html" %}
 </section>
+{% include "_filters.html" %}
 
 {% if ai_status == "ready" %}
   {% if items %}
-  <p class="result-note">"<strong>{{ q }}</strong>"와(과) <strong>가장 비슷한 물건부터</strong> 보여 줘요.
+  <p class="result-note">{% if category %}<strong>{{ category }}</strong> 종류에서 {% endif %}"<strong>{{ q }}</strong>"와(과) <strong>가장 비슷한 물건부터</strong> 보여 줘요.
     {% if uses_descriptions %}AI가 사진, Claude가 쓴 설명, 겹치는 단어를 함께 따져서 정한 순서예요.{% else %}AI가 사진을 보고 정한 순서예요.{% endif %}
     번호가 작을수록 더 비슷해요.</p>
   <p id="rerank-status" class="rerank-status" role="status" hidden></p>
@@ -68,6 +69,11 @@
       }
     })();
   </script>
+  {% elif category %}
+  <div class="empty">
+    <p>'{{ category }}' 종류에서는 찾은 물건이 없어요.</p>
+    <a class="btn" href="{{ category_links[0].url }}">모든 종류에서 찾기</a>
+  </div>
   {% else %}
   <div class="empty">
     <p>아직 검색할 수 있는 물건이 없어요.</p>
