@@ -17,6 +17,17 @@ from . import config, db, storage
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "db" / "migrations"
 # 서버가 여러 대 동시에 켜져도 한 대씩만 적용하게 거는 '자물쇠' 번호(아무 숫자나 정해 두면 된다)
 MIGRATION_LOCK = 20261117
+# 자물쇠를 기다리는 최대 시간
+LOCK_WAIT = "30s"
+
+
+def _pending(conn) -> list[Path]:
+    """아직 적용하지 않은 SQL 파일 목록(이름 순서)."""
+    if conn.execute("select to_regclass('schema_migrations')").fetchone()[0] is None:
+        done = set()  # 처음 설정하는 DB
+    else:
+        done = {row[0] for row in conn.execute("select name from schema_migrations")}
+    return [file for file in sorted(MIGRATIONS_DIR.glob("*.sql")) if file.name not in done]
 
 
 def apply_sql_migrations(say=print) -> list[str]:
@@ -29,29 +40,45 @@ def apply_sql_migrations(say=print) -> list[str]:
         raise SystemExit(f"\n[DB 연결 실패] {db.connection_hint(message)}\n  오류 내용: {message.splitlines()[0]}\n")
     applied = []
     with conn:
-        conn.execute("select pg_advisory_lock(%s)", (MIGRATION_LOCK,))  # 연결이 끝나면 저절로 풀린다
-        conn.execute(
-            """
-            create table if not exists schema_migrations (
-                name       text primary key,
-                applied_at timestamptz not null default now()
+        # 바꿀 것이 없으면 자물쇠 없이 바로 끝낸다(서버가 켜질 때 대부분 이 경우).
+        if not _pending(conn):
+            say("  새로 적용할 파일이 없어요(모두 적용됨).")
+            return applied
+        # 자물쇠를 기다리는 시간을 정해 둔다. 자물쇠가 어딘가에 남아 있어도 서버가 계속 멈춰 있지 않게.
+        conn.execute("select set_config('lock_timeout', %s, true)", (LOCK_WAIT,))
+        try:
+            conn.execute("select pg_advisory_lock(%s)", (MIGRATION_LOCK,))
+        except psycopg.errors.LockNotAvailable:
+            raise SystemExit(
+                f"\n[DB 구조 바꾸기 못 함] 다른 서버가 DB 구조를 바꾸는 중이라 {LOCK_WAIT} 기다렸지만 끝나지 않았어요.\n"
+                "  잠시 뒤 서버를 다시 켜거나 python -m app.migrate를 다시 실행하세요.\n"
             )
-            """
-        )
-        conn.execute("alter table schema_migrations enable row level security")
         conn.commit()
-
-        done = {row[0] for row in conn.execute("select name from schema_migrations")}
-        for file in sorted(MIGRATIONS_DIR.glob("*.sql")):
-            if file.name in done:
-                say(f"  건너뜀(이미 적용됨): {file.name}")
-                continue
-            # 파일 하나를 통째로 한 번에 적용한다. 중간에 오류가 나면 그 파일 전체가 취소된다.
-            conn.execute(file.read_text(encoding="utf-8"))
-            conn.execute("insert into schema_migrations (name) values (%s)", (file.name,))
+        try:
+            conn.execute(
+                """
+                create table if not exists schema_migrations (
+                    name       text primary key,
+                    applied_at timestamptz not null default now()
+                )
+                """
+            )
+            conn.execute("alter table schema_migrations enable row level security")
             conn.commit()
-            say(f"  적용함: {file.name}")
-            applied.append(file.name)
+            # 자물쇠를 건 뒤에 다시 확인한다(기다리는 사이 다른 서버가 적용했을 수 있다).
+            for file in _pending(conn):
+                # 파일 하나를 통째로 한 번에 적용한다. 중간에 오류가 나면 그 파일 전체가 취소된다.
+                conn.execute(file.read_text(encoding="utf-8"))
+                conn.execute("insert into schema_migrations (name) values (%s)", (file.name,))
+                conn.commit()
+                say(f"  적용함: {file.name}")
+                applied.append(file.name)
+        finally:
+            # 자물쇠는 꼭 직접 푼다. Supabase 연결 중계기(pooler)는 우리가 연결을 끊어도 DB 쪽 연결을
+            # 다음 손님에게 다시 쓸 수 있어서, 그냥 두면 자물쇠가 남아 다음에 켜지는 서버가 기다리게 된다.
+            conn.rollback()  # 오류로 멈춘 작업이 있으면 먼저 취소하고
+            conn.execute("select pg_advisory_unlock(%s)", (MIGRATION_LOCK,))
+            conn.commit()
     return applied
 
 
