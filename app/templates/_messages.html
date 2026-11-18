@@ -1,0 +1,33 @@
+{# 쪽지 대화 (회원의 쪽지함과 관리자 화면이 같이 쓴다).
+   viewer: "user"(회원이 보는 화면) 또는 "admin"(관리자 화면), member: 관리자 화면에서 대화 상대 회원 #}
+<ol class="thread">
+  {% for m in messages %}
+  {% set mine = m.from_admin if viewer == "admin" else not m.from_admin %}
+  <li class="bubble {{ 'mine' if mine else 'theirs' }}" id="{{ 'latest' if loop.last else 'msg-' ~ m.id }}">
+    <p class="bubble-who">
+      {% if m.from_admin %}관리자{% elif viewer == "user" %}나{% else %}{{ member.nickname }}{% endif %}
+      · {{ m.created_at|korean_date }}
+      {% if mine %}· {{ "읽음" if m.read_at else "안 읽음" }}{% endif %}
+    </p>
+    {% if m.item_id %}
+    <p class="bubble-item">
+      {% if viewer == "admin" %}
+      <a href="/admin?view=all#item-{{ m.item_id }}">{{ m.item_id }}번 물건</a>
+      {% elif not m.item_hidden %}
+      <a href="/items/{{ m.item_id }}">{{ m.item_id }}번 물건</a>
+      {% else %}
+      {{ m.item_id }}번 물건
+      {% endif %}
+      {% if m.item_name %}· {{ m.item_name }}{% endif %}{% if m.item_place %} · {{ m.item_place }} 보관{% endif %}
+    </p>
+    {% endif %}
+    <p class="bubble-body">{{ m.body }}</p>
+    {% if viewer == "admin" %}
+    <form class="bubble-tools" method="post" action="/admin/inbox/messages/{{ m.id }}/delete"
+          onsubmit="return confirm('이 쪽지를 지울까요? 되돌릴 수 없어요.');">
+      <button class="link-button bubble-delete" type="submit">지우기</button>
+    </form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ol>

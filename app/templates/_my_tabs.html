@@ -1,0 +1,8 @@
+{# 내 메뉴 탭: '내가 등록한 물건'과 '쪽지함' 사이를 오간다 #}
+{% set unread = unread_messages(request) %}
+<nav class="tabs" aria-label="내 메뉴">
+  <a href="/my" class="{{ 'active' if request.url.path == '/my' }}" {% if request.url.path == '/my' %}aria-current="page"{% endif %}>내가 등록한 물건</a>
+  <a href="/inbox" class="{{ 'active' if request.url.path == '/inbox' }}" {% if request.url.path == '/inbox' %}aria-current="page"{% endif %}>
+    쪽지함{% if unread %} <span class="count">새 쪽지 {{ unread }}</span>{% endif %}
+  </a>
+</nav>

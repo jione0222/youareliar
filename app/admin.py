@@ -1,4 +1,5 @@
 """관리자 화면 (/admin): 장난 글 숨기기·지우기, '주인 찾음' 표시(찾아간 사람 기록), 가린 사진 확인.
+쪽지함(회원 문의)은 inbox.py에 있다.
 
 관리자인지 확인하는 방법
 - .env의 ADMIN_PASSWORD를 아는 사람만 들어올 수 있다.
@@ -115,8 +116,9 @@ def update_status(item_id: int, status: str, claimant_name: str = "", claimant_s
     name = claimant_name.strip()[:20] or None
     student_id = claimant_student_id.strip()[:20] or None
     db.set_status(item_id, status, name, student_id)
-    who = f" (찾아간 사람: {name or '이름 없음'}{f', 학번 {student_id}' if student_id else ''})" if status == "returned" else ""
-    return f"{item_id}번을 '{STATUS_LABELS[status]}'(으)로 바꿨어요.{who}"
+    # 이 메시지는 주소(?msg=)에 붙어서 기록에 남을 수 있으니 이름·학번은 넣지 않는다.
+    noted = " 찾아간 사람도 적어 뒀어요(관리자만 볼 수 있어요)." if status == "returned" and (name or student_id) else ""
+    return f"{item_id}번을 '{STATUS_LABELS[status]}'(으)로 바꿨어요.{noted}"
 
 
 def update_hidden(item_id: int, hidden: bool) -> str:
@@ -153,6 +155,7 @@ def admin_home(request: Request, view: str = "all", msg: str = ""):
             "view": view,
             "views": VIEW_LABELS,
             "counts": db.admin_counts(),
+            "unread": db.unread_for_admin(),  # 아직 안 읽은 회원 쪽지 수
             "message": msg[:200],
         },
     )

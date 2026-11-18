@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}쪽지함 · 관리자 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>쪽지함</h1>
+  <a class="btn btn-small" href="/admin">물건 관리로</a>
+</div>
+<p class="lead">회원이 보낸 문의예요. '다른 사람이 내 물건을 가져갔다'는 문의라면, 대화 화면 위쪽에서 그 물건의 찾아간 사람 기록을 확인하세요.</p>
+
+{% if conversations %}
+<ul class="conversation-list">
+  {% for c in conversations %}
+  <li>
+    <a class="conversation{{ ' has-unread' if c.unread }}" href="/admin/inbox/{{ c.id }}">
+      <span class="conversation-who">
+        <strong>{{ c.nickname }}</strong> <span class="card-meta">({{ c.username }})</span>
+        {% if c.unread %}<span class="badge warn">새 쪽지 {{ c.unread }}</span>{% endif %}
+      </span>
+      <span class="conversation-last">{{ "관리자: " if c.last_from_admin }}{{ c.last_body|truncate(60, true) }}</span>
+      <span class="card-meta">{{ c.last_at|korean_date }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty"><p>아직 받은 쪽지가 없어요.</p></div>
+{% endif %}
+{% endblock %}

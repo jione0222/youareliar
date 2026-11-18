@@ -284,12 +284,19 @@ def set_status(item_id: int, status: str, claimant_name: str | None = None,
             )
 
 
+# 등록한 사람용: 찾아간 사람의 이름·학번은 관리자만 보므로 읽지 않고, 기록이 있는지만 알려 준다.
+MY_COLUMNS = """id, created_at, thumb_path, storage_place, found_place, found_date, memo,
+               status, hidden, ai_info, privacy_reviewed, category, view_count,
+               finder_name, finder_phone, returned_at, user_id,
+               (claimant_name is not null or claimant_student_id is not null) as has_claimant"""
+
+
 def my_items(user_id: int) -> list[dict]:
     """로그인한 사람이 등록한 물건들 (숨긴 글까지)."""
     with pool.connection() as conn:
         return conn.execute(
             f"""
-            select {MANAGE_COLUMNS}
+            select {MY_COLUMNS}
             from items
             where user_id = %s
             order by created_at desc
@@ -472,3 +479,125 @@ def items_for_rerank(ids: list[int]) -> list[dict]:
     by_id = {row["id"]: row for row in rows}
     return [by_id[i] for i in ids if i in by_id]
 
+
+
+# ---------- 쪽지함 (회원 ↔ 관리자) ----------
+
+
+def get_user(user_id: int) -> dict | None:
+    with pool.connection() as conn:
+        return conn.execute(
+            "select id, username, nickname, created_at from users where id = %s", (user_id,)
+        ).fetchone()
+
+
+def item_brief(item_id: int) -> dict | None:
+    """쪽지에 붙일 물건의 간단한 정보 (습득자 연락처나 찾아간 사람 기록은 읽지 않는다)."""
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select id, thumb_path, storage_place, status, hidden, user_id, category, ai_info, privacy_reviewed
+            from items where id = %s
+            """,
+            (item_id,),
+        ).fetchone()
+
+
+def manage_items_by_ids(ids: list[int]) -> list[dict]:
+    """관리자용: 쪽지에 나온 물건들 (찾아간 사람 기록까지)."""
+    if not ids:
+        return []
+    with pool.connection() as conn:
+        return conn.execute(
+            f"select {MANAGE_COLUMNS} from items where id = any(%s) order by id", (ids,)
+        ).fetchall()
+
+
+def add_message(user_id: int, body: str, from_admin: bool = False, item_id: int | None = None) -> None:
+    with pool.connection() as conn:
+        conn.execute(
+            "insert into messages (user_id, from_admin, item_id, body) values (%s, %s, %s, %s)",
+            (user_id, from_admin, item_id, body),
+        )
+
+
+def thread(user_id: int) -> list[dict]:
+    """한 회원과 관리자가 주고받은 쪽지 (오래된 것부터). 붙인 물건의 이름·보관 장소도 같이."""
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select m.id, m.from_admin, m.item_id, m.body, m.created_at, m.read_at,
+                   i.storage_place as item_place, i.hidden as item_hidden,
+                   coalesce(i.ai_info->>'category', i.category) as item_name
+            from messages m left join items i on i.id = m.item_id
+            where m.user_id = %s
+            order by m.id
+            """,
+            (user_id,),
+        ).fetchall()
+
+
+def mark_read(user_id: int, from_admin: bool) -> None:
+    """from_admin=True: 회원이 관리자의 쪽지를 읽음 / False: 관리자가 회원의 쪽지를 읽음."""
+    with pool.connection() as conn:
+        conn.execute(
+            "update messages set read_at = now() where user_id = %s and from_admin = %s and read_at is null",
+            (user_id, from_admin),
+        )
+
+
+def unread_for_user(user_id: int) -> int:
+    """회원이 아직 안 읽은 관리자 쪽지 수."""
+    with pool.connection() as conn:
+        return conn.execute(
+            "select count(*) as n from messages where user_id = %s and from_admin and read_at is null",
+            (user_id,),
+        ).fetchone()["n"]
+
+
+def unread_for_admin() -> int:
+    """관리자가 아직 안 읽은 회원 쪽지 수."""
+    with pool.connection() as conn:
+        return conn.execute(
+            "select count(*) as n from messages where not from_admin and read_at is null"
+        ).fetchone()["n"]
+
+
+def sent_today(user_id: int) -> int:
+    """회원이 최근 24시간 동안 보낸 쪽지 수 (장난 쪽지 막기)."""
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select count(*) as n from messages
+            where user_id = %s and not from_admin and created_at > now() - interval '24 hours'
+            """,
+            (user_id,),
+        ).fetchone()["n"]
+
+
+def conversations(limit: int = 200) -> list[dict]:
+    """관리자용 대화 목록: 회원마다 마지막 쪽지와 안 읽은 수 (최근 대화부터)."""
+    with pool.connection() as conn:
+        return conn.execute(
+            """
+            select u.id, u.username, u.nickname,
+                   last.body as last_body, last.from_admin as last_from_admin, last.created_at as last_at,
+                   (select count(*) from messages x
+                    where x.user_id = u.id and not x.from_admin and x.read_at is null) as unread
+            from users u
+            join lateral (
+                select body, from_admin, created_at from messages m
+                where m.user_id = u.id order by m.id desc limit 1
+            ) last on true
+            order by last.created_at desc
+            limit %s
+            """,
+            (limit,),
+        ).fetchall()
+
+
+def delete_message(message_id: int) -> int | None:
+    """쪽지 하나를 지우고, 그 쪽지가 있던 대화의 회원 번호를 돌려준다(없었으면 None)."""
+    with pool.connection() as conn:
+        row = conn.execute("delete from messages where id = %s returning user_id", (message_id,)).fetchone()
+    return row["user_id"] if row else None

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
-from . import auth, config, describe, storage
+from . import auth, config, db, describe, storage
 
 APP_DIR = Path(__file__).resolve().parent
 
@@ -40,6 +40,16 @@ def today() -> date:
     return datetime.now(config.TIMEZONE).date()
 
 
+def unread_messages(request) -> int:
+    """로그인한 회원이 아직 안 읽은 관리자 쪽지 수 (로그인 안 했으면 0). 한 화면에서 DB는 한 번만 묻는다."""
+    user = auth.current_user(request)
+    if user is None:
+        return 0
+    if getattr(request.state, "unread_messages", None) is None:
+        request.state.unread_messages = db.unread_for_user(user["id"])
+    return request.state.unread_messages
+
+
 # 템플릿(HTML) 안에서 쓸 수 있게 등록해 둔다.
 templates.env.globals["photo_url"] = storage.public_url
 templates.env.globals["STATUS_LABELS"] = STATUS_LABELS
@@ -48,4 +58,5 @@ templates.env.globals["privacy_flagged"] = privacy_flagged
 templates.env.globals["HIDE_PRIVATE_PHOTOS"] = config.HIDE_PRIVATE_PHOTOS
 templates.env.globals["ai_enabled"] = describe.enabled
 templates.env.globals["current_user"] = auth.current_user
+templates.env.globals["unread_messages"] = unread_messages
 templates.env.filters["korean_date"] = korean_date

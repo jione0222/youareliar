@@ -5,7 +5,10 @@
 {% block content %}
 <div class="admin-head">
   <h1>관리자 화면</h1>
-  <form method="post" action="/admin/logout"><button class="btn btn-small" type="submit">나가기</button></form>
+  <div class="admin-head-actions">
+    <a class="btn btn-small{{ ' btn-primary' if unread }}" href="/admin/inbox">쪽지함{% if unread %} · 새 쪽지 {{ unread }}{% endif %}</a>
+    <form method="post" action="/admin/logout"><button class="btn btn-small" type="submit">나가기</button></form>
+  </div>
 </div>
 
 {% if message %}<p class="alert success" role="status">{{ message }}</p>{% endif %}
@@ -21,7 +24,7 @@
 {% if items %}
 <ul class="admin-list">
   {% set base = "/admin/items" %}
-  {% set allow_privacy = true %}
+  {% set admin_view = true %}
   {% for item in items %}
     {% include "_manage_item.html" %}
   {% endfor %}

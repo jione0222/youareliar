@@ -72,6 +72,10 @@
     <div class="notice">
       <strong>내 물건 같다면?</strong>
       <p>{{ item.storage_place }}에 가서 선생님께 확인을 받은 뒤 찾아가세요. 이 사이트는 물건이 어디 있는지만 알려 줘요.</p>
+      <p class="notice-ask">
+        {% if item.status == "returned" %}내 물건인데 다른 사람이 찾아갔다면{% else %}궁금한 점이 있으면{% endif %}
+        <a href="/inbox?item={{ item.id }}#write">관리자에게 쪽지로 문의</a>하세요.
+      </p>
     </div>
   </div>
 </article>

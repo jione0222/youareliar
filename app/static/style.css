@@ -1077,3 +1077,185 @@ h1 {
 a.user-name {
   text-decoration: none;
 }
+
+/* ---------- 쪽지함 ---------- */
+.inbox-alert {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+.bubble {
+  max-width: 88%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+/* 내가 보낸 쪽지는 오른쪽, 받은 쪽지는 왼쪽 */
+.bubble.mine {
+  align-self: flex-end;
+  border-color: transparent;
+  background: var(--stored-bg);
+}
+
+.bubble.theirs {
+  align-self: flex-start;
+}
+
+.bubble p {
+  margin: 0;
+}
+
+.bubble .bubble-who {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.bubble .bubble-item {
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.bubble-item a {
+  color: var(--primary);
+}
+
+.bubble-body {
+  white-space: pre-wrap; /* 줄 바꿈을 그대로 보여 준다 */
+  overflow-wrap: anywhere;
+}
+
+.bubble-tools {
+  margin: 6px 0 0;
+  text-align: right;
+}
+
+.bubble-delete {
+  color: var(--error-text);
+  font-size: 0.8rem;
+}
+
+.message-form {
+  max-width: none;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.message-form h2,
+.related-items h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.related-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 20px;
+}
+
+.about-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.about-item img {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.about-item p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.about-item a,
+.message-form .hint a,
+.notice-ask a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.notice .notice-ask {
+  margin-top: 8px;
+}
+
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.conversation.has-unread {
+  border-color: var(--primary);
+}
+
+.conversation-last {
+  overflow-wrap: anywhere;
+}
+
+.admin-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-head-actions form {
+  margin: 0;
+}
+
+/* 좁은 휴대폰: 로고가 줄어들어 닉네임과 겹치지 않게 하고, '쪽지 N'이 떠 있을 때는 닉네임을 잠깐 숨긴다 */
+.top-left {
+  flex: none;
+}
+
+@media (max-width: 400px) {
+  .user-menu:has(.inbox-alert) .user-name {
+    display: none;
+  }
+}

@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
-from . import accounts, admin, auth, categories, db, embedding, images, indexing, migrate, mine, rerank, search, storage
+from . import accounts, admin, auth, categories, db, embedding, images, inbox, indexing, migrate, mine, rerank, search, storage
 from .templating import templates, today
 
 APP_DIR = Path(__file__).resolve().parent
@@ -65,6 +65,7 @@ if not storage.using_supabase():
 app.include_router(admin.router)  # 관리자 화면 (/admin)
 app.include_router(accounts.router)  # 회원가입·로그인 (/signup, /login, /logout)
 app.include_router(mine.router)  # 내가 등록한 물건 관리 (/my)
+app.include_router(inbox.router)  # 쪽지함 (/inbox, /admin/inbox)
 
 # ---------- 화면 ----------
 
@@ -107,11 +108,9 @@ def item_list(request: Request, sort: str = "new", cat: str = ""):
 @app.get("/register")
 def register_form(request: Request):
     """습득물 등록 화면."""
-    values = {"found_date": today().isoformat()}
-    user = auth.current_user(request)
-    if user:
-        values["finder_name"] = user["nickname"]  # 로그인했으면 이름 칸을 미리 채워 둔다(지워도 된다)
-    return render_register(request, values=values)
+    # 연락처(이름·전화번호) 칸은 비워 둔다. 미리 채워 두면 연락처를 남기지 않으려는 사람도
+    # '공개 동의' 오류를 보게 되고, 원하지 않는 정보 공개를 부추길 수 있다.
+    return render_register(request, values={"found_date": today().isoformat()})
 
 
 def normalize_phone(text: str) -> str:

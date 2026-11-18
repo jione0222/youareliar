@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ member.nickname }}님과의 쪽지 · 관리자 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>{{ member.nickname }}님과의 쪽지</h1>
+  <a class="btn btn-small" href="/admin/inbox">쪽지함으로</a>
+</div>
+<p class="card-meta">아이디 {{ member.username }} · {{ member.created_at|korean_date }} 가입</p>
+
+{% if message %}<p class="alert success" role="status">{{ message }}</p>{% endif %}
+
+{% if related %}
+<section class="related-items">
+  <h2>쪽지에 나온 물건</h2>
+  <ul class="admin-list">
+    {% for item in related %}
+    <li class="admin-item {{ 'is-hidden' if item.hidden }}">
+      <a href="/admin?view=all#item-{{ item.id }}"><img src="{{ photo_url(item.thumb_path) }}" alt="{{ item.id }}번 사진" loading="lazy" width="96" height="96"></a>
+      <div class="admin-info">
+        <p class="admin-title">
+          <strong>{{ item.id }}번</strong>
+          {% if item.ai_info %}{{ item.ai_info.category }}{% endif %}
+          <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
+          {% if item.hidden %}<span class="badge warn">숨김</span>{% endif %}
+        </p>
+        <p class="card-meta">{{ item.storage_place }} 보관 · 등록 {{ item.created_at|korean_date }}{% if item.user_id == member.id %} · 이 회원이 등록한 물건{% endif %}</p>
+        {% if item.finder_name or item.finder_phone %}<p class="card-meta">습득자 연락처: {{ item.finder_name or "이름 없음" }} {{ item.finder_phone or "" }}</p>{% endif %}
+        {% if item.status == "returned" %}
+        <p class="card-meta claimant">
+          찾아간 사람: {{ item.claimant_name or "기록 없음" }}{% if item.claimant_student_id %} (학번 {{ item.claimant_student_id }}){% endif %}{% if item.returned_at %} · {{ item.returned_at|korean_date }}{% endif %}
+        </p>
+        {% endif %}
+        <p class="card-meta"><a href="/admin?view=all#item-{{ item.id }}">물건 관리 화면에서 보기</a></p>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if messages %}
+  {% set viewer = "admin" %}
+  {% include "_messages.html" %}
+{% else %}
+<div class="empty"><p>아직 주고받은 쪽지가 없어요. 아래에서 먼저 보낼 수 있어요.</p></div>
+{% endif %}
+
+<form id="write" class="form message-form" method="post" action="/admin/inbox/{{ member.id }}">
+  <h2>{{ member.nickname }}님에게 쪽지 보내기</h2>
+  {% if error %}<p class="alert error" role="alert">{{ error }}</p>{% endif %}
+  {% if about_id %}
+  <input type="hidden" name="item_id" value="{{ about_id }}">
+  <p class="hint">{{ about_id }}번 물건에 대한 쪽지로 보내요. <a href="/admin/inbox/{{ member.id }}#write">물건 빼기</a></p>
+  {% endif %}
+  <label class="field">
+    <span>내용</span>
+    <textarea name="body" rows="4" maxlength="{{ max_length }}" required>{{ body }}</textarea>
+  </label>
+  <button class="btn btn-primary btn-block" type="submit">보내기</button>
+</form>
+{% endblock %}

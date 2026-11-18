@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}쪽지함 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+{% include "_my_tabs.html" %}
+<h1>쪽지함</h1>
+<p class="lead">관리자(선생님)에게 쪽지로 문의하고 답장을 받아요. 다른 사람이 내 물건을 찾아간 것 같거나 궁금한 점이 있으면 보내 주세요. 쪽지는 나와 관리자만 볼 수 있어요.</p>
+
+{% if message %}<p class="alert success" role="status">{{ message }}</p>{% endif %}
+
+{% if messages %}
+  {% set viewer = "user" %}
+  {% include "_messages.html" %}
+{% else %}
+<div class="empty"><p>아직 주고받은 쪽지가 없어요.</p></div>
+{% endif %}
+
+<form id="write" class="form message-form" method="post" action="/inbox">
+  <h2>관리자에게 쪽지 보내기</h2>
+  {% if error %}<p class="alert error" role="alert">{{ error }}</p>{% endif %}
+  {% if about %}
+  <div class="about-item">
+    {% if not photo_hidden(about) %}<img src="{{ photo_url(about.thumb_path) }}" alt="" width="48" height="48">{% endif %}
+    <p>
+      <strong>{{ about.id }}번 물건</strong>에 대한 쪽지예요.
+      {% if about.ai_info %}{{ about.ai_info.category }} · {% endif %}{{ about.storage_place }} 보관 · {{ STATUS_LABELS[about.status] }}
+      <a href="/inbox#write">물건 빼기</a>
+    </p>
+    <input type="hidden" name="item_id" value="{{ about.id }}">
+  </div>
+  {% endif %}
+  <label class="field">
+    <span>내용</span>
+    <textarea name="body" rows="5" maxlength="{{ max_length }}" required
+              placeholder="{{ '예: 이 물건은 제 것인데 다른 사람이 찾아갔다고 나와요. 뚜껑에 제 이름 스티커가 있어요.' if about and about.status == 'returned' else '예: 3층 복도에서 잃어버린 파란 텀블러를 찾고 있어요.' }}">{{ body }}</textarea>
+  </label>
+  <p class="hint">물건을 돌려받는 건 보관 장소에서 선생님 확인을 받은 뒤에 해요. 전화번호 같은 개인정보는 꼭 필요할 때만 적어 주세요.</p>
+  <button class="btn btn-primary btn-block" type="submit">보내기</button>
+</form>
+{% endblock %}

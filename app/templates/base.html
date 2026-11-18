@@ -28,7 +28,9 @@
       {% set user = current_user(request) %}
       {% if user %}
       <form class="user-menu" method="post" action="/logout">
-        <a class="user-name" href="/my" title="내가 등록한 물건">{{ user.nickname }}님</a>
+        <a class="user-name" href="/my" title="내가 등록한 물건·쪽지함">{{ user.nickname }}님</a>
+        {% set unread = unread_messages(request) %}
+        {% if unread %}<a class="inbox-alert" href="/inbox#latest" aria-label="안 읽은 쪽지 {{ unread }}개">쪽지 {{ unread }}</a>{% endif %}
         <button class="link-button" type="submit">로그아웃</button>
       </form>
       {% else %}
@@ -54,7 +56,7 @@
         <button type="button" data-mode="dark">어둡게</button>
       </span>
     </div>
-    <a href="/admin">관리자</a>
+    <a href="/inbox">관리자에게 문의(쪽지)</a> · <a href="/admin">관리자 화면</a>
   </footer>
   <script>
     // 뒤로 가기: 이 사이트 안에서 넘어왔으면 바로 전 화면으로, 주소로 바로 들어왔으면 첫 화면으로 간다.
