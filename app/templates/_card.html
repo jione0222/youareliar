@@ -8,7 +8,8 @@
     {% endif %}
     <div class="card-body">
       <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
-      {% if item.ai_info %}<p class="card-what">{{ item.ai_info.category }}</p>{% endif %}
+      {% if item.title %}<p class="card-what">{{ item.title }}</p>
+      {% elif item.ai_info %}<p class="card-what">{{ item.ai_info.category }}</p>{% endif %}
       <p class="card-place">{{ item.storage_place }} 보관</p>
       <p class="card-meta">
         {{ item.found_place or "발견 장소 모름" }}{% if item.found_date %} · {{ item.found_date|korean_date }}{% endif %}{% if item.view_count %} · 조회 {{ item.view_count }}{% endif %}

@@ -67,7 +67,7 @@ def _candidate_text(item: dict) -> str:
         f"브랜드: {info.get('brand') or '없음'}",
         f"특징: {', '.join(info.get('features', [])) or '없음'}",
         f"설명: {info.get('description', '')}",
-        f"주운 사람 메모: {item['memo'] or '없음'}",
+        f"주운 사람이 쓴 제목·메모: {item['memo'] or '없음'}",
         f"발견 장소: {item['found_place'] or '모름'}",
         f"발견 날짜: {item['found_date'] or '모름'}",
     ]

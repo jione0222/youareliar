@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ item.storage_place }} 보관 중인 물건 · 학교 분실물 찾기{% endblock %}
+{% block title %}{{ item.title or (item.storage_place ~ " 보관 중인 물건") }} · 학교 분실물 찾기{% endblock %}
 
 {% block content %}
 {% if new %}
@@ -21,6 +21,7 @@
   {% endif %}
   <div class="detail-body">
     <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
+    {% if item.title %}<h1 class="detail-title">{{ item.title }}</h1>{% endif %}
     <dl class="info">
       <dt>보관 장소</dt>
       <dd class="strong">{{ item.storage_place }}</dd>

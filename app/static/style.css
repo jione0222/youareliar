@@ -1353,3 +1353,8 @@ a.user-name {
   width: 30px;
   height: 30px;
 }
+
+.detail-title {
+  margin: 8px 0 0;
+  font-size: 1.3rem;
+}

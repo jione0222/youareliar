@@ -21,7 +21,7 @@
       <div class="admin-info">
         <p class="admin-title">
           <strong>{{ item.id }}번</strong>
-          {% if item.ai_info %}{{ item.ai_info.category }}{% endif %}
+          {% if item.title %}{{ item.title }}{% elif item.ai_info %}{{ item.ai_info.category }}{% endif %}
           <span class="badge {{ item.status }}">{{ STATUS_LABELS[item.status] }}</span>
           {% if item.hidden %}<span class="badge warn">숨김</span>{% endif %}
         </p>

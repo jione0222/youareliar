@@ -125,6 +125,7 @@ def register(
     found_place: str = Form(""),
     found_date: str = Form(""),
     memo: str = Form(""),
+    title: str = Form(""),
     category: str = Form(""),
     finder_name: str = Form(""),
     finder_phone: str = Form(""),
@@ -136,6 +137,7 @@ def register(
         "found_place": found_place,
         "found_date": found_date,
         "memo": memo,
+        "title": title,
         "category": category,
         "finder_name": finder_name,
         "finder_phone": finder_phone,
@@ -150,6 +152,9 @@ def register(
     storage_place = storage_place.strip()
     found_place = found_place.strip()
     memo = memo.strip()
+    title = " ".join(title.split())  # 줄 바꿈·겹친 빈칸을 한 칸으로
+    if len(title) > 40:
+        return fail("제목은 40자까지 쓸 수 있어요.")
     if not storage_place:
         return fail("보관 장소를 적어 주세요.")
     if len(storage_place) > 50 or len(found_place) > 50:
@@ -211,12 +216,14 @@ def register(
         category=categories.clean(category),  # 고르지 않았으면 None → Claude가 정한다
         finder_name=finder_name or None,
         finder_phone=finder_phone or None,
+        title=title or None,
     )
 
     # 5) AI 검색을 위해 사진을 벡터로 바꿔 저장한다.
     indexing.index_photo(item_id, photo_jpeg)
     # B 단계: Claude 설명은 몇 초 걸리므로, 화면을 먼저 보여 주고 뒤에서 처리한다.
-    background_tasks.add_task(indexing.describe_item, item_id, photo_jpeg, memo or None)
+    note = " / ".join(part for part in (title, memo) if part)  # Claude에게는 제목과 메모를 함께 준다
+    background_tasks.add_task(indexing.describe_item, item_id, photo_jpeg, note or None)
 
     # 6) 상세 화면으로 보낸다. 303으로 보내면 새로고침해도 두 번 등록되지 않는다.
     return RedirectResponse(f"/items/{item_id}?new=1", status_code=303)

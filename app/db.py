@@ -64,6 +64,11 @@ def check_connection() -> str | None:
     return None
 
 
+# AI(Claude)와 검색에 넘기는 '주운 사람이 쓴 글': 제목과 메모를 합쳐서 memo라는 이름으로 읽는다.
+# 예: 제목 '파란 텀블러', 메모 '뚜껑에 스티커' → '파란 텀블러 / 뚜껑에 스티커'
+NOTE = "nullif(concat_ws(' / ', title, memo), '') as memo"
+
+
 def add_item(
     photo_path: str,
     thumb_path: str,
@@ -72,6 +77,7 @@ def add_item(
     found_date: date | None,
     memo: str | None,
     user_id: int | None = None,
+    title: str | None = None,
     category: str | None = None,
     finder_name: str | None = None,
     finder_phone: str | None = None,
@@ -82,12 +88,12 @@ def add_item(
         row = conn.execute(
             """
             insert into items (photo_path, thumb_path, storage_place, found_place, found_date, memo, user_id,
-                               category, finder_name, finder_phone)
-            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                               category, finder_name, finder_phone, title)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             returning id
             """,
             (photo_path, thumb_path, storage_place, found_place, found_date, memo, user_id,
-             category, finder_name, finder_phone),
+             category, finder_name, finder_phone, title),
         ).fetchone()
     return row["id"]
 
@@ -108,7 +114,7 @@ def list_items(sort: str = "new", category: str | None = None, limit: int = 60) 
         return conn.execute(
             f"""
             select id, created_at, thumb_path, storage_place, found_place, found_date, status,
-                   ai_info, privacy_reviewed, category, view_count
+                   ai_info, privacy_reviewed, category, view_count, title
             from items
             where not hidden and (%s::text is null or category = %s)
             order by {order}
@@ -214,8 +220,8 @@ def items_missing_description(limit: int) -> list[dict]:
     """아직 Claude 설명이 없는 물건들 (오래된 것부터)."""
     with pool.connection() as conn:
         return conn.execute(
-            """
-            select id, photo_path, memo
+            f"""
+            select id, photo_path, {NOTE}
             from items
             where ai_info is null and not hidden
             order by id
@@ -238,7 +244,7 @@ ADMIN_VIEWS = {
 
 
 # 관리 화면(관리자 화면과 '내가 등록한 물건')에서 보여 줄 칸
-MANAGE_COLUMNS = """id, created_at, thumb_path, storage_place, found_place, found_date, memo,
+MANAGE_COLUMNS = """id, created_at, thumb_path, storage_place, found_place, found_date, memo, title,
                    status, hidden, ai_info, privacy_reviewed, category, view_count,
                    finder_name, finder_phone, claimant_name, claimant_student_id, returned_at, user_id"""
 
@@ -285,7 +291,7 @@ def set_status(item_id: int, status: str, claimant_name: str | None = None,
 
 
 # 등록한 사람용: 찾아간 사람의 이름·학번은 관리자만 보므로 읽지 않고, 기록이 있는지만 알려 준다.
-MY_COLUMNS = """id, created_at, thumb_path, storage_place, found_place, found_date, memo,
+MY_COLUMNS = """id, created_at, thumb_path, storage_place, found_place, found_date, memo, title,
                status, hidden, ai_info, privacy_reviewed, category, view_count,
                finder_name, finder_phone, returned_at, user_id,
                (claimant_name is not null or claimant_student_id is not null) as has_claimant"""
@@ -352,8 +358,8 @@ def items_missing_description_vector(model: str) -> list[dict]:
     """Claude 설명은 있는데 설명 벡터가 아직 없는 물건들."""
     with pool.connection() as conn:
         return conn.execute(
-            """
-            select i.id, i.ai_info, i.memo
+            f"""
+            select i.id, i.ai_info, {NOTE}
             from items i
             where i.ai_info is not null
               and not exists (
@@ -375,8 +381,8 @@ def keyword_rows(category: str | None = None) -> list[dict]:
     """키워드 검색에 쓸 글 재료 (공개된 물건만, category가 있으면 그 종류만)."""
     with pool.connection() as conn:
         return conn.execute(
-            """
-            select id, ai_info, memo, found_place, storage_place from items
+            f"""
+            select id, ai_info, {NOTE}, found_place, storage_place from items
             where not hidden and (%s::text is null or category = %s)
             """,
             (category, category),
@@ -386,7 +392,7 @@ def keyword_rows(category: str | None = None) -> list[dict]:
 def items_missing_category() -> list[dict]:
     """종류가 아직 비어 있는 물건들 (짐작해서 채우려고)."""
     with pool.connection() as conn:
-        return conn.execute("select id, ai_info, memo from items where category is null").fetchall()
+        return conn.execute(f"select id, ai_info, {NOTE} from items where category is null").fetchall()
 
 
 def set_category_if_empty(item_id: int, category: str) -> None:
@@ -402,7 +408,7 @@ def items_by_ids(ids: list[int]) -> dict[int, dict]:
         rows = conn.execute(
             """
             select id, created_at, thumb_path, storage_place, found_place, found_date, status,
-                   ai_info, privacy_reviewed, category, view_count
+                   ai_info, privacy_reviewed, category, view_count, title
             from items
             where id = any(%s) and not hidden
             """,
@@ -469,8 +475,8 @@ def items_for_rerank(ids: list[int]) -> list[dict]:
         return []
     with pool.connection() as conn:
         rows = conn.execute(
-            """
-            select id, ai_info, memo, found_place, found_date, storage_place
+            f"""
+            select id, ai_info, {NOTE}, found_place, found_date, storage_place
             from items
             where id = any(%s) and not hidden
             """,
@@ -496,7 +502,7 @@ def item_brief(item_id: int) -> dict | None:
     with pool.connection() as conn:
         return conn.execute(
             """
-            select id, thumb_path, storage_place, status, hidden, user_id, category, ai_info, privacy_reviewed
+            select id, thumb_path, storage_place, status, hidden, user_id, category, ai_info, privacy_reviewed, title
             from items where id = %s
             """,
             (item_id,),
@@ -528,7 +534,7 @@ def thread(user_id: int) -> list[dict]:
             """
             select m.id, m.from_admin, m.item_id, m.body, m.created_at, m.read_at,
                    i.storage_place as item_place, i.hidden as item_hidden,
-                   coalesce(i.ai_info->>'category', i.category) as item_name
+                   coalesce(i.title, i.ai_info->>'category', i.category) as item_name
             from messages m left join items i on i.id = m.item_id
             where m.user_id = %s
             order by m.id

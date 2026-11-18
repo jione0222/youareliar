@@ -45,6 +45,12 @@
   </fieldset>
 
   <label class="field">
+    <span>제목 <span class="opt">선택</span></span>
+    <input name="title" maxlength="40" placeholder="예: 파란 텀블러, 검은 체육복 상의"
+           value="{{ values.title or '' }}">
+  </label>
+
+  <label class="field">
     <span>보관 장소 <span class="req">필수</span></span>
     <input name="storage_place" list="place-suggestions" required maxlength="50"
            placeholder="예: 교무실" value="{{ values.storage_place or '' }}">
