@@ -311,6 +311,30 @@ def my_items(user_id: int) -> list[dict]:
         ).fetchall()
 
 
+# 관리자 '고치기' 화면에서 바꿀 수 있는 칸 (정해 둔 이름만 SQL에 쓴다)
+EDITABLE = ("title", "storage_place", "found_place", "found_date", "memo", "category",
+            "finder_name", "finder_phone", "claimant_name", "claimant_student_id")
+
+
+def update_item(item_id: int, values: dict) -> None:
+    """관리자가 고친 내용을 저장한다. values: {칸 이름: 값} (EDITABLE에 있는 칸만)"""
+    columns = [name for name in EDITABLE if name in values]
+    if not columns:
+        return
+    assignments = ", ".join(f"{name} = %s" for name in columns)
+    with pool.connection() as conn:
+        conn.execute(
+            f"update items set {assignments} where id = %s",
+            [values[name] for name in columns] + [item_id],
+        )
+
+
+def delete_vector(item_id: int, kind: str) -> None:
+    """물건의 벡터를 지운다. 제목·메모를 고치면 설명 벡터를 지우고 새로 만든다."""
+    with pool.connection() as conn:
+        conn.execute("delete from item_vectors where item_id = %s and kind = %s", (item_id, kind))
+
+
 def item_owner(item_id: int) -> int | None:
     """물건을 등록한 회원 번호 (로그인하지 않고 등록했거나 물건이 없으면 None)."""
     with pool.connection() as conn:

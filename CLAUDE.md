@@ -103,7 +103,7 @@
   - 정렬: `db.SORTS`(new/old/views), 목록 `?sort=`. 조회 수는 상세 화면을 열 때 +1(방금 등록한 것과 등록한 사람이 본 것은 세지 않음).
   - 사진 자르기: Cropper.js 1.6.2(MIT)를 `app/static/vendor/cropperjs-1.6.2/`에 넣었다(외부 CDN 안 씀). 고른 파일을 잘라 JPEG로 만든 뒤 DataTransfer로 file input에 바꿔 끼우고 보낸다. 못 하는 브라우저면 원래 사진을 보낸다. EXIF 방향은 Cropper의 checkOrientation이 처리한다.
   - 화면 색: style.css의 `--h/--s/--l/--dl/--tl/--dtl` 숫자로 강조색을 만들고, `[data-accent]`(6색)와 `[data-mode=light|dark]`가 바꾼다. 색마다 명암비 4.5 이상이 되게 밝기를 계산했다. localStorage(`theme-accent`, `theme-mode`)에 저장하고 head의 짧은 스크립트가 먼저 적용한다.
-  - 연락처: 등록 때 이름·전화번호(선택) + 공개 동의 체크 필수, 전화번호는 `main.normalize_phone`으로 010-1234-5678 모양. Claude나 검색 글에는 넣지 않는다.
+  - 연락처: 등록 때 이름·전화번호(선택) + 공개 동의 체크 필수, 전화번호는 `forms.normalize_phone`으로 010-1234-5678 모양. Claude나 검색 글에는 넣지 않는다.
   - 내 물건 관리(`app/mine.py`, `/my`): `items.user_id`가 나인 물건만(남의 것은 403). 주인 찾음·숨기기·지우기는 `admin.update_status/update_hidden/remove_item`을 같이 쓴다. 사진 개인정보 확인은 관리자만. 관리 화면 한 줄은 `_manage_item.html`을 관리자와 같이 쓴다. 숨긴 글도 등록한 사람은 상세 화면을 볼 수 있다. 위쪽 막대의 닉네임이 `/my` 링크다.
   - 찾아간 사람 기록(이름·학번)은 **관리자만** 본다(2026-11-18 팀 결정: 거짓 주인이 몰래 가져가는 일에 대비한 기록). 등록한 사람은 '주인 찾음' 때 적을 수만 있고 `/my`에는 '기록 있음'만 보인다(`db.MY_COLUMNS`는 이름·학번을 읽지 않음). 결과 메시지(주소의 `?msg=`)에도 넣지 않는다. '보관 중'으로 되돌리면 지운다. 학번은 개인정보라서 얼마나 보관할지 선생님과 정해야 한다.
   - 시험: Node Playwright(휴대폰 크기)로 28가지를 끝까지 확인했다(자르기 결과 크기·색, 동의 없는 연락처 거절, 조회 수, 필터·정렬, 검색 필터, 뒤로 가기, 테마 유지, 주인 찾음 기록·되돌리기, 숨기기 404, 남의 물건 403, 지우기). 이 환경에는 파이썬 Playwright가 없다.
@@ -113,4 +113,5 @@
 - 검색 필터(2026-11-18): `_search_form.html`의 접히는 칸(`.filter-panel`, 처음엔 `hidden`, 자바스크립트로 펼침). 분류 select(`name=cat`, 목록은 템플릿 전역 `CATEGORY_GROUPS`), 초기화·검색하기. 검색어 없이 검색하면 `/search`가 `/?cat=`(그 분류 목록)으로 보낸다. 분류를 고르면 버튼에 1이 붙고 아래에 '필터 해제'(`clear_filter_url`)가 보인다. 예전 종류 버튼 줄(`_filters.html`, `category_links`)은 지웠다. 낱말 짐작: 귀금속은 액세서리보다 먼저(금목걸이), 카드지갑은 가방·지갑이 먼저.
 - 대화 기록 텍스트(보고서용)는 `exports/`에 만들고 깃에는 올리지 않는다(.gitignore).
 - 제목(2026-11-18, 팀 요청): 마이그레이션 009 `items.title`(선택, 40자, 빈칸 정리). 등록 화면 사진 아래 '제목' 칸. 카드·상세(h1)·관리 화면·쪽지에 제목을 먼저 보이고, 없으면 Claude가 본 이름. AI·검색에는 `db.NOTE`(SQL `concat_ws(' / ', title, memo) as memo`)로 제목과 메모를 합쳐 넘긴다(Claude 사진 정리, 설명 벡터, 키워드, 재순위, 종류 짐작). 이 환경엔 Claude 키가 없어 제목은 키워드(비중 0.5)로만 잡혀 전체 순위가 낮게 나왔다(키워드 1등은 확인).
+- 관리자 고치기(2026-11-18, 팀 요청: 관리자 기능을 더 만능으로): 관리 줄의 '고치기' → `/admin/items/{id}/edit`(`admin_edit.html`). 제목·보관 장소·발견 장소·발견 날짜·종류·메모·습득자 연락처, '주인 찾음'이면 찾아간 사람 이름·학번까지. 고칠 수 있는 칸은 `db.EDITABLE`만(`db.update_item`). 확인 기준은 등록 화면과 같다(`forms.normalize_phone`을 같이 씀). 제목·메모가 바뀌면 설명 벡터를 지우고 뒤에서 다시 만든다(`indexing.backfill_description_vectors`). 사진 바꾸기·Claude 설명 다시 받기는 아직 없다.
 

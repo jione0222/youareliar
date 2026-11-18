@@ -56,6 +56,9 @@
       <button class="btn btn-small" type="submit">보관 중으로</button>
     </form>
     {% endif %}
+    {% if admin_view %}
+    <a class="btn btn-small" href="/admin/items/{{ item.id }}/edit">고치기</a>
+    {% endif %}
     {% if admin_view and item.user_id %}
     <a class="btn btn-small" href="/admin/inbox/{{ item.user_id }}?item={{ item.id }}">등록한 사람에게 쪽지</a>
     {% endif %}

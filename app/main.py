@@ -3,7 +3,6 @@
 실행:  uvicorn app.main:app --reload
 """
 import logging
-import re
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -16,6 +15,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
+from .forms import normalize_phone
 from . import accounts, admin, auth, categories, db, embedding, images, inbox, indexing, migrate, mine, rerank, search, storage
 from .templating import templates, today
 
@@ -103,16 +103,6 @@ def register_form(request: Request):
     # 연락처(이름·전화번호) 칸은 비워 둔다. 미리 채워 두면 연락처를 남기지 않으려는 사람도
     # '공개 동의' 오류를 보게 되고, 원하지 않는 정보 공개를 부추길 수 있다.
     return render_register(request, values={"found_date": today().isoformat()})
-
-
-def normalize_phone(text: str) -> str:
-    """전화번호를 010-1234-5678 모양으로 맞춘다. 이상한 번호면 ValueError."""
-    digits = re.sub(r"\D", "", text)
-    if not digits.startswith("0") or not 9 <= len(digits) <= 11:
-        raise ValueError(text)
-    if digits.startswith("02"):  # 서울 지역번호는 두 자리
-        return f"{digits[:2]}-{digits[2:-4]}-{digits[-4:]}"
-    return f"{digits[:3]}-{digits[3:-4]}-{digits[-4:]}"
 
 
 @app.post("/register")

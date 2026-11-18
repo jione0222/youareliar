@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.id }}번 고치기 · 관리자 · 학교 분실물 찾기{% endblock %}
+
+{% block content %}
+<div class="admin-head">
+  <h1>{{ item.id }}번 정보 고치기</h1>
+  <a class="btn btn-small" href="/admin#item-{{ item.id }}">취소</a>
+</div>
+<p class="card-meta">등록 {{ item.created_at|korean_date }} · {{ STATUS_LABELS[item.status] }}{% if item.hidden %} · 숨김{% endif %}</p>
+
+{% if error %}<p class="alert error" role="alert">{{ error }}</p>{% endif %}
+
+<form class="form edit-form" method="post" action="/admin/items/{{ item.id }}/edit">
+  <img class="edit-photo" src="{{ photo_url(item.thumb_path) }}" alt="{{ item.id }}번 사진" width="160" height="160">
+
+  <label class="field">
+    <span>제목</span>
+    <input name="title" maxlength="40" placeholder="예: 파란 텀블러" value="{{ values.title or '' }}">
+  </label>
+  <label class="field">
+    <span>보관 장소 <span class="req">필수</span></span>
+    <input name="storage_place" maxlength="50" required value="{{ values.storage_place or '' }}">
+  </label>
+  <label class="field">
+    <span>발견 장소</span>
+    <input name="found_place" maxlength="50" placeholder="예: 3층 복도" value="{{ values.found_place or '' }}">
+  </label>
+  <label class="field">
+    <span>발견 날짜</span>
+    <input type="date" name="found_date" max="{{ today }}" value="{{ values.found_date or '' }}">
+  </label>
+  <label class="field">
+    <span>물건 종류</span>
+    <select name="category">
+      {% if not values.category %}<option value="">정해지지 않음</option>{% endif %}
+      {% for group in groups %}
+      <option value="{{ group }}"{% if values.category == group %} selected{% endif %}>{{ group }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="field">
+    <span>메모</span>
+    <textarea name="memo" rows="3" maxlength="500">{{ values.memo or '' }}</textarea>
+  </label>
+
+  <fieldset class="contact-fields">
+    <legend>습득자 연락처</legend>
+    <p class="hint">로그인한 사람에게 보여요. 비우면 연락처가 지워져요.</p>
+    <label class="field"><span>이름</span><input name="finder_name" maxlength="20" value="{{ values.finder_name or '' }}"></label>
+    <label class="field"><span>전화번호</span><input name="finder_phone" type="tel" maxlength="20" value="{{ values.finder_phone or '' }}"></label>
+  </fieldset>
+
+  {% if item.status == "returned" %}
+  <fieldset class="contact-fields">
+    <legend>찾아간 사람 (관리자만 봄)</legend>
+    <label class="field"><span>이름</span><input name="claimant_name" maxlength="20" value="{{ values.claimant_name or '' }}"></label>
+    <label class="field"><span>학번</span><input name="claimant_student_id" maxlength="20" inputmode="numeric" value="{{ values.claimant_student_id or '' }}"></label>
+  </fieldset>
+  {% endif %}
+
+  <button class="btn btn-primary btn-block" type="submit">저장하기</button>
+</form>
+{% endblock %}
