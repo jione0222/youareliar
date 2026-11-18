@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
-from . import auth, config, db, describe, storage
+from . import auth, categories, config, db, describe, storage
 
 APP_DIR = Path(__file__).resolve().parent
 
@@ -59,4 +59,5 @@ templates.env.globals["HIDE_PRIVATE_PHOTOS"] = config.HIDE_PRIVATE_PHOTOS
 templates.env.globals["ai_enabled"] = describe.enabled
 templates.env.globals["current_user"] = auth.current_user
 templates.env.globals["unread_messages"] = unread_messages
+templates.env.globals["CATEGORY_GROUPS"] = categories.GROUPS
 templates.env.filters["korean_date"] = korean_date

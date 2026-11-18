@@ -26,6 +26,8 @@
   --error-bg: #fcebeb;
   --error-text: #9d2626;
   --radius: 14px;
+  --panel: hsl(var(--h) 30% 95%);
+  --panel-title: hsl(var(--h) 60% 25%);
 }
 
 /* 어두운 화면의 색: 휴대폰이 어두운 모드일 때(직접 '밝게'를 고르지 않았다면), 또는 '어둡게'를 골랐을 때 */
@@ -46,6 +48,8 @@
     --success-text: #8edcab;
     --error-bg: #381b1b;
     --error-text: #f1a3a3;
+    --panel: hsl(var(--h) 18% 15%);
+    --panel-title: hsl(var(--h) 80% 82%);
   }
 }
 
@@ -66,6 +70,8 @@
   --success-text: #8edcab;
   --error-bg: #381b1b;
   --error-text: #f1a3a3;
+  --panel: hsl(var(--h) 18% 15%);
+  --panel-title: hsl(var(--h) 80% 82%);
 }
 
 :root[data-mode="light"] {
@@ -110,6 +116,9 @@ body {
 }
 
 .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--text);
   font-weight: 800;
   text-decoration: none;
@@ -819,37 +828,116 @@ h1 {
   color: var(--stored-text);
 }
 
-/* 휴대폰에서는 버튼들을 옆으로 밀어서 본다 */
-.filters {
-  display: flex;
+/* ---------- 검색 필터 (검색 버튼 옆 '검색 필터'를 누르면 펼쳐지는 칸) ---------- */
+.filter-toggle {
   gap: 6px;
-  margin: 0 -16px 16px;
-  padding: 2px 16px;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-.filters::-webkit-scrollbar {
-  display: none;
-}
-
-.filter {
-  flex-shrink: 0;
-  padding: 6px 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.filter.active {
+.filter-toggle[aria-expanded="true"],
+.filter-toggle.is-active {
   border-color: var(--primary);
+  color: var(--primary);
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
   background: var(--primary);
   color: var(--on-primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.filter-panel {
+  margin: 4px 0 12px;
+  padding: 16px 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.filter-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.filter-panel-head h2 {
+  margin: 0;
+  color: var(--panel-title);
+  font-size: 1.05rem;
+}
+
+.filter-close {
+  display: flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.filter-rows {
+  padding: 4px 0 14px;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: 5.5em minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.filter-row label {
+  font-weight: 800;
+}
+
+.filter-row select {
+  width: 100%;
+  max-width: 320px;
+  min-height: 46px;
+  padding: 10px 40px 10px 14px;
+  border: 1px solid var(--muted);
+  border-radius: 8px;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%23778' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center / 18px;
+  color: var(--text);
+  font: inherit;
+  appearance: none;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--text);
+}
+
+.filter-actions .btn {
+  min-width: 96px;
+}
+
+.active-filter {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.active-filter strong {
+  color: var(--text);
+}
+
+.active-filter a {
+  margin-left: 6px;
+  color: var(--primary);
+  font-weight: 700;
 }
 
 /* ---------- 등록: 사진 자르기, 종류, 내 연락처 ---------- */
@@ -1258,4 +1346,10 @@ a.user-name {
   .user-menu:has(.inbox-alert) .user-name {
     display: none;
   }
+}
+
+.logo img {
+  flex: none;
+  width: 30px;
+  height: 30px;
 }

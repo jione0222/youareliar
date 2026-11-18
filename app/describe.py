@@ -29,7 +29,8 @@ class ItemDescription(BaseModel):
     """Claude가 돌려주는 결과의 모양. 필드 설명도 Claude에게 그대로 전달된다."""
 
     category: str = Field(description="물건 종류를 한국어로 짧게. 예: 텀블러, 체육복 상의, 무선 이어폰 케이스")
-    group: categories.Group = Field(description="물건을 이 목록에서 하나로 분류한다. 딱 맞는 것이 없으면 가장 가까운 것, 어디에도 안 맞으면 기타")
+    group: categories.Group = Field(description="물건을 이 목록에서 하나로 분류한다. 귀금속은 금·은·보석으로 된 반지·목걸이 등, "
+                                                        "그 밖의 장신구·안경·시계는 액세서리. 딱 맞는 것이 없으면 가장 가까운 것, 어디에도 안 맞으면 기타")
     colors: list[str] = Field(description="눈에 띄는 색을 한국어로. 예: 파란색, 검은색")
     brand: str = Field(description="보이는 브랜드나 로고 이름. 없거나 모르겠으면 빈 문자열")
     features: list[str] = Field(description="주인이 알아볼 만한 특징. 예: 뚜껑에 고양이 스티커, 모서리 긁힘, 곰돌이 키링")

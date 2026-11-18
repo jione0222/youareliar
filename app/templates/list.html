@@ -15,7 +15,6 @@
     {% endfor %}
   </nav>
 </div>
-{% include "_filters.html" %}
 
 {% if items %}
 <ul class="grid">
@@ -27,7 +26,7 @@
 {% elif category %}
 <div class="empty">
   <p>'{{ category }}' 종류로 등록된 물건이 아직 없어요.</p>
-  <a class="btn" href="{{ category_links[0].url }}">전체 보기</a>
+  <a class="btn" href="{{ clear_filter_url }}">전체 보기</a>
 </div>
 {% else %}
 <div class="empty">

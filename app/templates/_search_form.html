@@ -1,7 +1,66 @@
-<form class="search" action="/search" method="get" role="search">
-  <label class="visually-hidden" for="search-input">잃어버린 물건 설명</label>
-  <input id="search-input" type="search" name="q" value="{{ q or '' }}" maxlength="100" required
-         placeholder="예: 파란 텀블러, 고양이 스티커" enterkeyhint="search">
-  {% if category %}<input type="hidden" name="cat" value="{{ category }}">{% endif %}
-  <button class="btn btn-primary" type="submit">AI로 찾기</button>
+{# 검색 칸 + '검색 필터' 버튼. 필터는 처음엔 접혀 있고, 버튼을 누르면 아래로 펼쳐진다. #}
+<form class="search-box" action="/search" method="get" role="search">
+  <div class="search">
+    <label class="visually-hidden" for="search-input">잃어버린 물건 설명</label>
+    <input id="search-input" type="search" name="q" value="{{ q or '' }}" maxlength="100"
+           placeholder="예: 파란 텀블러, 고양이 스티커" enterkeyhint="search">
+    <button class="btn btn-primary" type="submit">검색</button>
+    <button class="btn filter-toggle{{ ' is-active' if category }}" type="button"
+            aria-expanded="false" aria-controls="search-filter">
+      검색 필터{% if category %} <span class="filter-count">1</span>{% endif %}
+    </button>
+  </div>
+
+  <section id="search-filter" class="filter-panel" aria-label="검색 필터" hidden>
+    <div class="filter-panel-head">
+      <h2>검색 필터</h2>
+      <button class="filter-close" type="button" aria-label="검색 필터 닫기">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 15l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="filter-rows">
+      <div class="filter-row">
+        <label for="filter-category">물품 분류</label>
+        <select id="filter-category" name="cat">
+          <option value="">전체 분류</option>
+          {% for group in CATEGORY_GROUPS %}
+          <option value="{{ group }}"{% if category == group %} selected{% endif %}>{{ group }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button class="btn btn-small" type="button" data-filter-reset>초기화</button>
+      <button class="btn btn-small btn-primary" type="submit">검색하기</button>
+    </div>
+  </section>
 </form>
+{% if category %}
+<p class="active-filter">물품 분류: <strong>{{ category }}</strong>
+  <a href="{{ clear_filter_url }}">필터 해제</a></p>
+{% endif %}
+<script>
+  // 검색 필터 펼치기·접기. 검색어 없이 '검색하기'를 누르면 그 분류의 목록을 보여 준다.
+  (() => {
+    const form = document.querySelector(".search-box");
+    if (!form) return;
+    const toggle = form.querySelector(".filter-toggle");
+    const panel = form.querySelector(".filter-panel");
+    const setOpen = (open) => {
+      panel.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) form.querySelector("#filter-category").focus();
+    };
+    toggle.addEventListener("click", () => setOpen(panel.hidden));
+    form.querySelector(".filter-close").addEventListener("click", () => { setOpen(false); toggle.focus(); });
+    form.querySelector("[data-filter-reset]").addEventListener("click", () => {
+      form.querySelector("#filter-category").value = "";
+    });
+    form.addEventListener("submit", () => {
+      // 분류를 안 골랐으면 주소에 빈 'cat='이 붙지 않게 뺀다
+      const select = form.querySelector("#filter-category");
+      if (!select.value) select.disabled = true;
+    });
+    window.addEventListener("pageshow", () => { form.querySelector("#filter-category").disabled = false; });
+  })();
+</script>

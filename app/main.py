@@ -79,14 +79,6 @@ def _url(path: str, **params) -> str:
     return f"{path}?{query}" if query else path
 
 
-def category_links(path: str, current: str | None, **keep) -> list[dict]:
-    """종류 필터 버튼들: [{label, url, active}, ...]. keep: 함께 유지할 값(검색어, 정렬)"""
-    links = [{"label": "전체", "url": _url(path, **keep), "active": current is None}]
-    for group in categories.GROUPS:
-        links.append({"label": group, "url": _url(path, **keep, cat=group), "active": current == group})
-    return links
-
-
 @app.get("/")
 def item_list(request: Request, sort: str = "new", cat: str = ""):
     """첫 화면: 습득물 목록. ?sort=new|old|views 로 정렬하고, ?cat=의류 처럼 종류를 고를 수 있다."""
@@ -96,7 +88,7 @@ def item_list(request: Request, sort: str = "new", cat: str = ""):
         "items": db.list_items(sort, category),
         "sort": sort,
         "category": category,
-        "category_links": category_links("/", category, sort=None if sort == "new" else sort),
+        "clear_filter_url": _url("/", sort=None if sort == "new" else sort),  # 분류 필터만 빼는 주소
         "sort_links": [
             {"label": label, "url": _url("/", sort=None if key == "new" else key, cat=category), "active": key == sort}
             for key, label in SORT_LABELS.items()
@@ -235,13 +227,13 @@ def search_page(request: Request, q: str = "", debug: bool = False, cat: str = "
     """AI 검색: 사진 벡터·설명 벡터·키워드로 찾은 순위를 합쳐서 비슷한 물건부터 보여 준다.
     주소 끝에 &debug=1 을 붙이면 카드마다 방법별 등수가 보인다(발표·시험용)."""
     query = q.strip()[:100]
-    if not query:
-        return RedirectResponse("/", status_code=303)
     category = categories.clean(cat)
+    if not query:  # 검색어 없이 필터만 골랐으면 그 분류의 목록을 보여 준다
+        return RedirectResponse(_url("/", cat=category), status_code=303)
     context = {
         "q": query,
         "category": category,
-        "category_links": category_links("/search", category, q=query, debug="1" if debug else None),
+        "clear_filter_url": _url("/search", q=query, debug="1" if debug else None),
         "items": [],
         "ai_status": embedding.status(),
         "uses_descriptions": embedding.text_status() == "ready",

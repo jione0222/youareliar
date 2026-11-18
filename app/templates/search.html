@@ -6,7 +6,6 @@
 <section class="intro">
   {% include "_search_form.html" %}
 </section>
-{% include "_filters.html" %}
 
 {% if ai_status == "ready" %}
   {% if items %}
@@ -72,7 +71,7 @@
   {% elif category %}
   <div class="empty">
     <p>'{{ category }}' 종류에서는 찾은 물건이 없어요.</p>
-    <a class="btn" href="{{ category_links[0].url }}">모든 종류에서 찾기</a>
+    <a class="btn" href="{{ clear_filter_url }}">모든 종류에서 찾기</a>
   </div>
   {% else %}
   <div class="empty">
